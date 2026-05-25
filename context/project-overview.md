@@ -348,6 +348,13 @@ Model: `gpt-4o-mini` via OpenAI API.
 - Clean typography, generous whitespace, subtle borders and shadows
 - Syntax highlighting on all code blocks
 
+### Screenshots
+
+Refer to the screenshots below as a base for the dashboard UI. It does not have to be exact. Use it as a reference.
+
+- @context/screenshots/dashboard-ui-main.png
+- @context/screenshots/dashboard-ui-drawer.png
+
 ### Layout
 
 ```
