@@ -32,12 +32,7 @@ export default function DashboardLayout({
               </Button>
             </div>
           </header>
-          <main className="flex-1 p-6">
-            <h2 className="text-sm font-semibold text-muted-foreground">
-              Main
-            </h2>
-            {children}
-          </main>
+          <main className="flex-1 p-6">{children}</main>
         </div>
       </div>
     </SidebarProvider>
