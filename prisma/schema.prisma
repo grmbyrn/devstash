@@ -17,6 +17,7 @@ model User {
   name                 String?
   email                String?   @unique
   emailVerified        DateTime?
+  password             String?   // bcrypt hash for credentials auth; null for OAuth-only users
   image                String?
   isPro                Boolean   @default(false)
   stripeCustomerId     String?   @unique
