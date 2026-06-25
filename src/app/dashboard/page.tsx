@@ -3,7 +3,11 @@ import { FolderHeart, FolderOpen, Library, Star } from "lucide-react";
 import { CollectionCard } from "@/components/dashboard/collection-card";
 import { ItemCard } from "@/components/dashboard/item-card";
 import { StatCard } from "@/components/dashboard/stat-card";
-import { collections, items, itemTypes, tags } from "@/lib/mock-data";
+import {
+  getCollectionStats,
+  getRecentCollections,
+} from "@/lib/db/collections";
+import { items, itemTypes, tags } from "@/lib/mock-data";
 
 const RECENT_COLLECTIONS_LIMIT = 6;
 const RECENT_ITEMS_LIMIT = 10;
@@ -11,37 +15,18 @@ const RECENT_ITEMS_LIMIT = 10;
 const typeById = new Map(itemTypes.map((t) => [t.id, t]));
 const tagById = new Map(tags.map((t) => [t.id, t]));
 
-function accentTypeForCollection(collectionId: string) {
-  const collection = collections.find((c) => c.id === collectionId);
-  if (!collection) return undefined;
+export default async function DashboardPage() {
+  const [recentCollections, collectionStats] = await Promise.all([
+    getRecentCollections(RECENT_COLLECTIONS_LIMIT),
+    getCollectionStats(),
+  ]);
 
-  const counts = new Map<string, number>();
-  for (const itemId of collection.itemIds) {
-    const item = items.find((i) => i.id === itemId);
-    if (!item) continue;
-    counts.set(item.itemTypeId, (counts.get(item.itemTypeId) ?? 0) + 1);
-  }
-  const topTypeId =
-    [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ??
-    collection.defaultTypeId;
-
-  return topTypeId ? typeById.get(topTypeId) : undefined;
-}
-
-export default function DashboardPage() {
   const stats = {
     items: items.length,
-    collections: collections.length,
+    collections: collectionStats.total,
     favoriteItems: items.filter((i) => i.isFavorite).length,
-    favoriteCollections: collections.filter((c) => c.isFavorite).length,
+    favoriteCollections: collectionStats.favorites,
   };
-
-  const recentCollections = [...collections]
-    .sort(
-      (a, b) =>
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-    )
-    .slice(0, RECENT_COLLECTIONS_LIMIT);
 
   const pinnedItems = items.filter((i) => i.isPinned);
 
@@ -88,11 +73,7 @@ export default function DashboardPage() {
       <Section title="Recent collections">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {recentCollections.map((c) => (
-            <CollectionCard
-              key={c.id}
-              collection={c}
-              accentType={accentTypeForCollection(c.id)}
-            />
+            <CollectionCard key={c.id} collection={c} />
           ))}
         </div>
       </Section>
