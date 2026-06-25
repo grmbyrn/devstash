@@ -1,6 +1,6 @@
 # Current feature
 
-_None active._ The Seed Data feature was completed on 2026-06-23 — see History below. Pick the next feature and document its goals here.
+_None active._ The Dashboard Collections feature was completed on 2026-06-25 — see History below. Pick the next feature and document its goals here.
 
 ## History
 
@@ -11,3 +11,4 @@ _None active._ The Seed Data feature was completed on 2026-06-23 — see History
 - 2026-06-11 — **Dashboard UI — Phase 3** (Completed). Main dashboard content area: 4 stats cards (total/favorite items + collections), recent collections, pinned items, and 10 most-recent items, all derived from `src/lib/mock-data.ts`. Spec: @context/features/dashboard-phase-3-spec.md.
 - 2026-06-23 — **Prisma + Neon PostgreSQL Setup** (Completed). Stood up the database layer: Prisma 7 ORM against Neon serverless Postgres, initial `schema.prisma` covering core data models + NextAuth tables, indexes and `onDelete: Cascade` rules, first migration via `prisma migrate dev`. Shipped in #1 (`feat/database-prisma-neon`). Spec: @context/features/database-spec.md.
 - 2026-06-23 — **Seed Data** (Completed). `prisma/seed.ts` now seeds a demo user (`demo@devstash.io`, password `12345678`), the 7 system item types, and 5 collections / 18 items (React Patterns, AI Workflows, DevOps, Terminal Commands, Design Resources) with real URLs — all idempotent. Added `bcryptjs` for 12-round password hashing. Beyond the original spec, added a nullable `password` field to the `User` model (migration `add_user_password`) so the hash lives on the user rather than a credentials `Account` row. Spec: @context/features/seed-spec.md.
+- 2026-06-25 — **Dashboard Collections** (Completed). Dashboard main area now reads real data from Neon via Prisma instead of `src/lib/mock-data.ts`. New `src/lib/db/collections.ts` exposes `getRecentCollections()` (collections by `updatedAt`, enriched with item count, most-used `accentType` for the card accent, and all distinct `types` ranked by frequency) and `getCollectionStats()` (total + favorite counts). `DashboardPage` is now an async server component; `CollectionCard` takes `CollectionWithMeta` and renders a small icon for every type present. Items/pinned/recent sections still use mock data (deferred). Shipped on branch `feat/dashboard-collections`. Spec: @context/features/dashboard-collections-spec.md.
