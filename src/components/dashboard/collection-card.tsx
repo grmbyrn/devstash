@@ -1,18 +1,16 @@
 import Link from "next/link";
 
-import type { Collection, ItemType } from "@/lib/mock-data";
+import type { CollectionWithMeta } from "@/lib/db/collections";
 
 import { ItemTypeIcon } from "./item-type-icon";
 
 export function CollectionCard({
   collection,
-  accentType,
 }: {
-  collection: Collection;
-  accentType: ItemType | undefined;
+  collection: CollectionWithMeta;
 }) {
-  const count = collection.itemIds.length;
-  const accent = accentType?.color ?? "var(--color-muted-foreground)";
+  const count = collection.itemCount;
+  const accent = collection.accentType?.color ?? "var(--color-muted-foreground)";
 
   return (
     <Link
@@ -35,13 +33,19 @@ export function CollectionCard({
             </p>
           )}
         </div>
-        {accentType && (
-          <span
-            className="grid size-6 shrink-0 place-items-center rounded-md bg-muted"
-            style={{ color: accent }}
-          >
-            <ItemTypeIcon name={accentType.icon} className="size-3.5" />
-          </span>
+        {collection.types.length > 0 && (
+          <div className="flex shrink-0 gap-1">
+            {collection.types.map((type) => (
+              <span
+                key={type.id}
+                title={type.name}
+                className="grid size-6 place-items-center rounded-md bg-muted"
+                style={{ color: type.color }}
+              >
+                <ItemTypeIcon name={type.icon} className="size-3.5" />
+              </span>
+            ))}
+          </div>
         )}
       </div>
       <div className="mt-auto text-xs text-muted-foreground">
