@@ -98,6 +98,35 @@ export async function getRecentItems(limit = 10): Promise<ItemWithMeta[]> {
   return rows.map(toItemWithMeta);
 }
 
+// Canonical display order for the seeded system types; anything unknown
+// (e.g. future custom types) sorts to the end.
+const SYSTEM_TYPE_ORDER = [
+  "snippet",
+  "prompt",
+  "command",
+  "note",
+  "link",
+  "file",
+  "image",
+];
+
+/** The system item types for the sidebar type list, in canonical order. */
+export async function getSystemItemTypes(): Promise<ItemTypeSummary[]> {
+  const types = await prisma.itemType.findMany({
+    where: { isSystem: true },
+    select: { id: true, name: true, icon: true, color: true },
+  });
+
+  return types.sort((a, b) => {
+    const rankA = SYSTEM_TYPE_ORDER.indexOf(a.name);
+    const rankB = SYSTEM_TYPE_ORDER.indexOf(b.name);
+    return (
+      (rankA === -1 ? SYSTEM_TYPE_ORDER.length : rankA) -
+      (rankB === -1 ? SYSTEM_TYPE_ORDER.length : rankB)
+    );
+  });
+}
+
 /** Aggregate item stats for the demo user's dashboard stat cards. */
 export async function getItemStats(): Promise<{
   total: number;
