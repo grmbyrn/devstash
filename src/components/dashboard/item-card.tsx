@@ -1,19 +1,11 @@
 import { Pin, Star } from "lucide-react";
 
-import type { Item, ItemType, Tag } from "@/lib/mock-data";
+import type { ItemWithMeta } from "@/lib/db/items";
 
 import { ItemTypeIcon } from "./item-type-icon";
 
-export function ItemCard({
-  item,
-  type,
-  tags,
-}: {
-  item: Item;
-  type: ItemType | undefined;
-  tags: Tag[];
-}) {
-  const accent = type?.color ?? "var(--color-muted-foreground)";
+export function ItemCard({ item }: { item: ItemWithMeta }) {
+  const accent = item.type.color;
   const preview = item.content?.trim() ?? item.url ?? item.description ?? "";
 
   return (
@@ -22,14 +14,12 @@ export function ItemCard({
       style={{ borderLeftWidth: 3, borderLeftColor: accent }}
     >
       <div className="flex items-start gap-2">
-        {type && (
-          <span
-            className="grid size-6 shrink-0 place-items-center rounded-md bg-muted"
-            style={{ color: accent }}
-          >
-            <ItemTypeIcon name={type.icon} className="size-3.5" />
-          </span>
-        )}
+        <span
+          className="grid size-6 shrink-0 place-items-center rounded-md bg-muted"
+          style={{ color: accent }}
+        >
+          <ItemTypeIcon name={item.type.icon} className="size-3.5" />
+        </span>
         <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
           {item.title}
         </h3>
@@ -47,14 +37,14 @@ export function ItemCard({
         </pre>
       )}
 
-      {tags.length > 0 && (
+      {item.tags.length > 0 && (
         <div className="flex flex-wrap gap-1">
-          {tags.map((tag) => (
+          {item.tags.map((tag) => (
             <span
-              key={tag.id}
+              key={tag}
               className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
             >
-              {tag.name}
+              {tag}
             </span>
           ))}
         </div>

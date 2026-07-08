@@ -7,37 +7,27 @@ import {
   getCollectionStats,
   getRecentCollections,
 } from "@/lib/db/collections";
-import { items, itemTypes, tags } from "@/lib/mock-data";
+import { getItemStats, getPinnedItems, getRecentItems } from "@/lib/db/items";
 
 const RECENT_COLLECTIONS_LIMIT = 6;
 const RECENT_ITEMS_LIMIT = 10;
 
-const typeById = new Map(itemTypes.map((t) => [t.id, t]));
-const tagById = new Map(tags.map((t) => [t.id, t]));
-
 export default async function DashboardPage() {
-  const [recentCollections, collectionStats] = await Promise.all([
-    getRecentCollections(RECENT_COLLECTIONS_LIMIT),
-    getCollectionStats(),
-  ]);
+  const [recentCollections, collectionStats, itemStats, pinnedItems, recentItems] =
+    await Promise.all([
+      getRecentCollections(RECENT_COLLECTIONS_LIMIT),
+      getCollectionStats(),
+      getItemStats(),
+      getPinnedItems(),
+      getRecentItems(RECENT_ITEMS_LIMIT),
+    ]);
 
   const stats = {
-    items: items.length,
+    items: itemStats.total,
     collections: collectionStats.total,
-    favoriteItems: items.filter((i) => i.isFavorite).length,
+    favoriteItems: itemStats.favorites,
     favoriteCollections: collectionStats.favorites,
   };
-
-  const pinnedItems = items.filter((i) => i.isPinned);
-
-  const recentItems = [...items]
-    .filter((i) => i.lastUsedAt)
-    .sort(
-      (a, b) =>
-        new Date(b.lastUsedAt ?? 0).getTime() -
-        new Date(a.lastUsedAt ?? 0).getTime(),
-    )
-    .slice(0, RECENT_ITEMS_LIMIT);
 
   return (
     <div className="flex flex-col gap-8">
@@ -82,14 +72,7 @@ export default async function DashboardPage() {
         <Section title="Pinned items">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {pinnedItems.map((item) => (
-              <ItemCard
-                key={item.id}
-                item={item}
-                type={typeById.get(item.itemTypeId)}
-                tags={item.tagIds
-                  .map((id) => tagById.get(id))
-                  .filter((t): t is NonNullable<typeof t> => Boolean(t))}
-              />
+              <ItemCard key={item.id} item={item} />
             ))}
           </div>
         </Section>
@@ -98,14 +81,7 @@ export default async function DashboardPage() {
       <Section title="Recent items">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {recentItems.map((item) => (
-            <ItemCard
-              key={item.id}
-              item={item}
-              type={typeById.get(item.itemTypeId)}
-              tags={item.tagIds
-                .map((id) => tagById.get(id))
-                .filter((t): t is NonNullable<typeof t> => Boolean(t))}
-            />
+            <ItemCard key={item.id} item={item} />
           ))}
         </div>
       </Section>
