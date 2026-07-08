@@ -8,6 +8,7 @@ import type {
   SidebarCollection,
 } from "@/lib/db/collections";
 import type { ItemTypeSummary } from "@/lib/db/items";
+import { Badge } from "@/components/ui/badge";
 import { currentUser } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +20,9 @@ export interface SidebarData {
   favorites: SidebarCollection[];
   recents: CollectionWithMeta[];
 }
+
+/** Item types gated behind Pro in production. */
+const PRO_TYPES = new Set(["file", "image"]);
 
 function titleCase(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -60,6 +64,16 @@ export function SidebarContent({
                 <ItemTypeIcon name={type.icon} className="size-4 shrink-0" />
               }
               color={type.color}
+              trailing={
+                PRO_TYPES.has(type.name) ? (
+                  <Badge
+                    variant="secondary"
+                    className="h-4 rounded px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
+                    Pro
+                  </Badge>
+                ) : undefined
+              }
               compact={compact}
               onClick={onNavigate}
             />
@@ -146,6 +160,7 @@ function NavItem({
   label,
   icon,
   color,
+  trailing,
   muted,
   compact,
   onClick,
@@ -154,6 +169,7 @@ function NavItem({
   label: string;
   icon: React.ReactNode;
   color?: string;
+  trailing?: React.ReactNode;
   muted?: boolean;
   compact: boolean;
   onClick?: () => void;
@@ -177,6 +193,7 @@ function NavItem({
           {icon}
         </span>
         {!compact && <span className="truncate">{label}</span>}
+        {!compact && trailing && <span className="ml-auto">{trailing}</span>}
       </Link>
     </li>
   );
