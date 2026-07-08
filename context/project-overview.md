@@ -402,49 +402,50 @@ Refer to the screenshots below as a base for the dashboard UI. It does not have 
 
 ```
 devstash/
-├── app/                        # Next.js App Router
-│   ├── (auth)/
-│   │   ├── login/
-│   │   └── register/
-│   ├── (dashboard)/
-│   │   ├── layout.tsx          # Sidebar + main shell
-│   │   ├── page.tsx            # Home / recent items
-│   │   ├── items/
-│   │   │   └── [type]/         # /items/snippets, /items/prompts, etc.
-│   │   ├── collections/
-│   │   │   └── [id]/
-│   │   └── search/
-│   └── api/
-│       ├── auth/[...nextauth]/
-│       ├── items/
-│       ├── collections/
-│       ├── tags/
-│       ├── upload/             # R2 file upload handler
-│       ├── export/             # JSON/ZIP export
-│       └── ai/                 # AI feature endpoints
-│           ├── tag/
-│           ├── summarize/
-│           ├── explain/
-│           └── optimize-prompt/
-├── components/
-│   ├── ui/                     # shadcn/ui primitives
-│   ├── item-drawer.tsx         # Quick-access slide-over
-│   ├── item-card.tsx
-│   ├── collection-card.tsx
-│   ├── sidebar.tsx
-│   └── search-bar.tsx
-├── lib/
-│   ├── prisma.ts               # Prisma client singleton
-│   ├── auth.ts                 # NextAuth config
-│   ├── r2.ts                   # Cloudflare R2 client
-│   ├── openai.ts               # OpenAI client
-│   └── utils.ts
-├── prisma/
-│   ├── schema.prisma
-│   ├── migrations/             # All migrations go here
-│   └── seed.ts                 # System item types
-└── types/
-    └── index.ts
+├── src/
+│   ├── app/                    # Next.js App Router
+│   │   ├── (auth)/
+│   │   │   ├── login/
+│   │   │   └── register/
+│   │   ├── (dashboard)/
+│   │   │   ├── layout.tsx      # Sidebar + main shell
+│   │   │   ├── page.tsx        # Home / recent items
+│   │   │   ├── items/
+│   │   │   │   └── [type]/     # /items/snippets, /items/prompts, etc.
+│   │   │   ├── collections/
+│   │   │   │   └── [id]/
+│   │   │   └── search/
+│   │   └── api/
+│   │       ├── auth/[...nextauth]/
+│   │       ├── items/
+│   │       ├── collections/
+│   │       ├── tags/
+│   │       ├── upload/         # R2 file upload handler
+│   │       ├── export/         # JSON/ZIP export
+│   │       └── ai/             # AI feature endpoints
+│   │           ├── tag/
+│   │           ├── summarize/
+│   │           ├── explain/
+│   │           └── optimize-prompt/
+│   ├── components/
+│   │   ├── ui/                 # shadcn/ui primitives
+│   │   ├── item-drawer.tsx     # Quick-access slide-over
+│   │   ├── item-card.tsx
+│   │   ├── collection-card.tsx
+│   │   ├── sidebar.tsx
+│   │   └── search-bar.tsx
+│   ├── lib/
+│   │   ├── prisma.ts           # Prisma client singleton
+│   │   ├── auth.ts             # NextAuth config
+│   │   ├── r2.ts               # Cloudflare R2 client
+│   │   ├── openai.ts           # OpenAI client
+│   │   └── utils.ts
+│   └── types/
+│       └── index.ts
+└── prisma/
+    ├── schema.prisma
+    ├── migrations/             # All migrations go here
+    └── seed.ts                 # System item types
 ```
 
 ---
