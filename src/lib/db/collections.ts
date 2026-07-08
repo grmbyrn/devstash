@@ -80,6 +80,24 @@ export async function getRecentCollections(
   });
 }
 
+/** A collection reduced to what the sidebar link needs to render. */
+export interface SidebarCollection {
+  id: string;
+  name: string;
+}
+
+/** The demo user's favorite collections for the sidebar, newest first. */
+export async function getFavoriteCollections(
+  limit = 10,
+): Promise<SidebarCollection[]> {
+  return prisma.collection.findMany({
+    where: { user: { email: DEMO_USER_EMAIL }, isFavorite: true },
+    orderBy: { updatedAt: "desc" },
+    take: limit,
+    select: { id: true, name: true },
+  });
+}
+
 /** Aggregate collection stats for the demo user's dashboard stat cards. */
 export async function getCollectionStats(): Promise<{
   total: number;
