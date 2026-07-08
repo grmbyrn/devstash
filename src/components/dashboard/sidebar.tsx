@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
-import { SidebarContent } from "./sidebar-content";
+import { SidebarContent, type SidebarData } from "./sidebar-content";
 import { useSidebar } from "./sidebar-provider";
 
-export function Sidebar() {
+export function Sidebar({ data }: { data: SidebarData }) {
   const { isCollapsed, isMobileOpen, setMobileOpen } = useSidebar();
 
   return (
@@ -20,12 +20,12 @@ export function Sidebar() {
           isCollapsed ? "w-16" : "w-60",
         )}
       >
-        <SidebarContent compact={isCollapsed} />
+        <SidebarContent data={data} compact={isCollapsed} />
       </aside>
 
       <Sheet open={isMobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="w-72 p-0 lg:hidden">
-          <SidebarContent />
+          <SidebarContent data={data} />
         </SheetContent>
       </Sheet>
     </>

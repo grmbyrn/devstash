@@ -4,16 +4,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sidebar, SidebarTrigger } from "@/components/dashboard/sidebar";
 import { SidebarProvider } from "@/components/dashboard/sidebar-provider";
+import {
+  getFavoriteCollections,
+  getRecentCollections,
+} from "@/lib/db/collections";
+import { getSystemItemTypes } from "@/lib/db/items";
 
-export default function DashboardLayout({
+const SIDEBAR_RECENT_LIMIT = 5;
+
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const [itemTypes, favorites, recents] = await Promise.all([
+    getSystemItemTypes(),
+    getFavoriteCollections(),
+    getRecentCollections(SIDEBAR_RECENT_LIMIT),
+  ]);
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen">
-        <Sidebar />
+        <Sidebar data={{ itemTypes, favorites, recents }} />
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur">
             <SidebarTrigger />

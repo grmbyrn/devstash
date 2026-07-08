@@ -28,6 +28,7 @@ type SeedItem = {
 type SeedCollection = {
   name: string;
   description: string;
+  isFavorite?: boolean;
   items: SeedItem[];
 };
 
@@ -35,6 +36,7 @@ const COLLECTIONS: SeedCollection[] = [
   {
     name: "React Patterns",
     description: "Reusable React patterns and hooks",
+    isFavorite: true,
     items: [
       {
         title: "useDebounce",
@@ -99,6 +101,7 @@ export function cn(...inputs: ClassValue[]) {
   },
   {
     name: "AI Workflows",
+    isFavorite: true,
     description: "AI prompts and workflow automations",
     items: [
       {
@@ -329,6 +332,7 @@ async function main() {
       data: {
         name: col.name,
         description: col.description,
+        isFavorite: col.isFavorite ?? false,
         userId: user.id,
       },
     });

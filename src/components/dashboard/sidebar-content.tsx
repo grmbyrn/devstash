@@ -3,42 +3,38 @@
 import Link from "next/link";
 import { Clock, Star } from "lucide-react";
 
-import {
-  collections,
-  currentUser,
-  itemTypes,
-  type Collection,
-} from "@/lib/mock-data";
+import type {
+  CollectionWithMeta,
+  SidebarCollection,
+} from "@/lib/db/collections";
+import type { ItemTypeSummary } from "@/lib/db/items";
+import { currentUser } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 import { ItemTypeIcon } from "./item-type-icon";
 import { useSidebar } from "./sidebar-provider";
 
-const RECENT_LIMIT = 5;
+export interface SidebarData {
+  itemTypes: ItemTypeSummary[];
+  favorites: SidebarCollection[];
+  recents: CollectionWithMeta[];
+}
 
 function titleCase(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function favoriteCollections(): Collection[] {
-  return collections.filter((c) => c.isFavorite);
-}
-
-function recentCollections(): Collection[] {
-  return [...collections]
-    .sort(
-      (a, b) =>
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-    )
-    .slice(0, RECENT_LIMIT);
-}
-
-export function SidebarContent({ compact = false }: { compact?: boolean }) {
+export function SidebarContent({
+  data,
+  compact = false,
+}: {
+  data: SidebarData;
+  compact?: boolean;
+}) {
   const { setMobileOpen } = useSidebar();
   const onNavigate = () => setMobileOpen(false);
 
-  const favorites = favoriteCollections();
-  const recents = recentCollections();
+  const { itemTypes, favorites, recents } = data;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -58,13 +54,10 @@ export function SidebarContent({ compact = false }: { compact?: boolean }) {
           {itemTypes.map((type) => (
             <NavItem
               key={type.id}
-              href={type.urlPath}
+              href={`/items/${type.name}s`}
               label={`${titleCase(type.name)}s`}
               icon={
-                <ItemTypeIcon
-                  name={type.icon}
-                  className="size-4 shrink-0"
-                />
+                <ItemTypeIcon name={type.icon} className="size-4 shrink-0" />
               }
               color={type.color}
               compact={compact}
@@ -97,12 +90,27 @@ export function SidebarContent({ compact = false }: { compact?: boolean }) {
               href={`/collections/${c.id}`}
               label={c.name}
               icon={
-                <Clock className="size-4 shrink-0 text-muted-foreground" />
+                <span
+                  aria-hidden
+                  className="size-2.5 shrink-0 rounded-full"
+                  style={{
+                    backgroundColor:
+                      c.accentType?.color ?? "var(--color-muted-foreground)",
+                  }}
+                />
               }
               compact={compact}
               onClick={onNavigate}
             />
           ))}
+          <NavItem
+            href="/collections"
+            label="View all collections"
+            icon={<Clock className="size-4 shrink-0 text-muted-foreground" />}
+            muted
+            compact={compact}
+            onClick={onNavigate}
+          />
         </Section>
       </nav>
 
@@ -138,6 +146,7 @@ function NavItem({
   label,
   icon,
   color,
+  muted,
   compact,
   onClick,
 }: {
@@ -145,6 +154,7 @@ function NavItem({
   label: string;
   icon: React.ReactNode;
   color?: string;
+  muted?: boolean;
   compact: boolean;
   onClick?: () => void;
 }) {
@@ -156,6 +166,7 @@ function NavItem({
         onClick={onClick}
         className={cn(
           "group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 transition-colors hover:bg-accent hover:text-accent-foreground",
+          muted && "text-muted-foreground",
           compact && "justify-center px-0",
         )}
       >
