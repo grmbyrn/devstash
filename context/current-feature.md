@@ -1,6 +1,18 @@
-# Current feature
+# Current Feature
 
-_None active._ The Stats & Sidebar feature was completed on 2026-07-08 — see History below. Pick the next feature and document its goals here.
+_None active._ Pick the next feature and document its goals here.
+
+## Status
+
+Not Started
+
+## Goals
+
+<!-- Bullet points of what success looks like -->
+
+## Notes
+
+<!-- Additional context, constraints, or details from spec -->
 
 ## History
 
@@ -14,3 +26,4 @@ _None active._ The Stats & Sidebar feature was completed on 2026-07-08 — see H
 - 2026-06-25 — **Dashboard Collections** (Completed). Dashboard main area now reads real data from Neon via Prisma instead of `src/lib/mock-data.ts`. New `src/lib/db/collections.ts` exposes `getRecentCollections()` (collections by `updatedAt`, enriched with item count, most-used `accentType` for the card accent, and all distinct `types` ranked by frequency) and `getCollectionStats()` (total + favorite counts). `DashboardPage` is now an async server component; `CollectionCard` takes `CollectionWithMeta` and renders a small icon for every type present. Items/pinned/recent sections still use mock data (deferred). Shipped on branch `feat/dashboard-collections`. Spec: @context/features/dashboard-collections-spec.md.
 - 2026-07-08 — **Dashboard Items** (Completed). Dashboard pinned items, recent items, and item stat cards now read real data from Neon instead of `src/lib/mock-data.ts`. New `src/lib/db/items.ts` exposes `getPinnedItems()` (`isPinned`, newest first), `getRecentItems(limit)` (ordered by `lastUsedAt` nulls-last, then `updatedAt`, so seeded items with no `lastUsedAt` still surface), and `getItemStats()` (total + favorite counts) — all sharing an `itemCardSelect` and returning the new `ItemWithMeta` shape (type summary + tag names). `ItemCard` refactored from the `{ item, type, tags }` mock triple to a single `item: ItemWithMeta` prop. `DashboardPage` dropped its `mock-data` import entirely. `mock-data.ts` remains only for the sidebar (out of scope). Lint + build pass; dashboard prerenders against the live DB. Shipped on branch `feat/dashboard-items`. Spec: @context/features/dashboard-items-spec.md.
 - 2026-07-08 — **Stats & Sidebar** (Completed). The sidebar now reads real data from Neon instead of `src/lib/mock-data.ts` (the main-area stats were already DB-backed from Dashboard Items). New `getSystemItemTypes()` in `src/lib/db/items.ts` returns the system types sorted into canonical order (via a `SYSTEM_TYPE_ORDER` list, since `ItemType` has no `createdAt`); new `getFavoriteCollections()` in `src/lib/db/collections.ts` returns a lean `SidebarCollection` shape, while recents reuse `getRecentCollections()` for its `accentType.color`. `DashboardLayout` is now an async server component fetching the three datasets and passing a `data` prop through `Sidebar` → `SidebarContent` (still a client component for the mobile-drawer context). Sidebar renders types with icons linking to `/items/{name}s`, keeps the ⭐ for favorite collections, shows a colored circle per recent (tinted by most-used type), and adds a "View all collections" link → `/collections`. Also fixed the seed: it never set `isFavorite`, so no favorites surfaced — `prisma/seed.ts` now marks React Patterns and AI Workflows as favorite (re-seeded + verified against Neon). The user footer still reads `currentUser` from `mock-data` (no auth yet — out of scope). Lint + build pass. Shipped on branch `main`. Spec: @context/features/stats-sidebar-spec.md.
+- 2026-07-08 — **Add Pro Badge to Sidebar** (Completed). The Files and Images sidebar Types rows now show a subtle uppercase **PRO** badge, surfacing their Pro-only gating in the UI. Added the shadcn `Badge` at `src/components/ui/badge.tsx` — the CLI (style `base-nova`) generated a `@base-ui/react`-based component, but that package isn't installed and the project uses `@radix-ui` + plain `cva`, so it was rewritten to match `button.tsx` (kept the shadcn variant classes, dropped the `useRender`/`mergeProps` base-ui dependency; this fixed the initial `module not found` build failure). In `SidebarContent`, a new `PRO_TYPES` set (`file`, `image`) drives a `Badge` passed through a new generic `trailing?: React.ReactNode` slot on `NavItem` (right-aligned via `ml-auto`, `secondary` variant, muted-foreground, `text-[10px]`, hidden in the collapsed icon rail). Lint + build pass; `/dashboard` prerenders. Shipped on branch `feat/add-pro-badge-sidebar`. Spec: @context/features/add-pro-badge-sidebar.md. Note: commit made with `--no-gpg-sign` (the repo's `gpg-loopback` signing program hangs in a non-interactive shell).
