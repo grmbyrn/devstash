@@ -1,0 +1,2 @@
+- [DevStash implementation status](devstash_implementation_status.md) — what's built vs. not (no auth/actions/api/upload/AI) as of 2026-07-09, avoid false "missing feature" findings
+- [DevStash conventions & deviations](devstash_conventions_and_deviations.md) — no src/types/ dir, duplicated DEMO_USER_EMAIL, oversized sidebar-content.tsx, unbounded item tally query, duplicate getRecentCollections fetch
