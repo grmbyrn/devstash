@@ -1,0 +1,3 @@
+- [DevStash implementation status](devstash_implementation_status.md) — what's built vs. not (no auth/actions/api/upload/AI) as of 2026-07-09, avoid false "missing feature" findings
+- [DevStash conventions & deviations](devstash_conventions_and_deviations.md) — no src/types/ dir, oversized sidebar-content.tsx, unbounded item tally query still open; DEMO_USER_EMAIL dup + redundant getRecentCollections fetch were FIXED on fix/audit-quick-wins (verified 2026-07-09)
+- [No listing tool available](no_listing_tool_workaround.md) — this agent config has no Bash/Glob/Grep; discover files by guessing paths from CLAUDE.md structure docs + feature history
