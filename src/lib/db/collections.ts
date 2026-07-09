@@ -1,7 +1,7 @@
-import { prisma } from "@/lib/prisma";
+import { cache } from "react";
 
-// No auth yet — all dashboard data belongs to the seeded demo user.
-const DEMO_USER_EMAIL = "demo@devstash.io";
+import { prisma } from "@/lib/prisma";
+import { DEMO_USER_EMAIL, RECENT_COLLECTIONS_LIMIT } from "@/lib/constants";
 
 /** A single item type present in a collection, with its display metadata. */
 export interface CollectionTypeSummary {
@@ -27,9 +27,12 @@ export interface CollectionWithMeta {
 /**
  * Fetch the demo user's most recently updated collections, each enriched with
  * its item count and the item types it contains (ranked by frequency).
+ *
+ * Wrapped in React's `cache()` so the sidebar (layout) and the main grid (page)
+ * share a single DB round trip per request as long as they pass the same limit.
  */
-export async function getRecentCollections(
-  limit = 6,
+export const getRecentCollections = cache(async function getRecentCollections(
+  limit = RECENT_COLLECTIONS_LIMIT,
 ): Promise<CollectionWithMeta[]> {
   const collections = await prisma.collection.findMany({
     where: { user: { email: DEMO_USER_EMAIL } },
@@ -78,7 +81,7 @@ export async function getRecentCollections(
       types: ranked.map((entry) => entry.type),
     };
   });
-}
+});
 
 /** A collection reduced to what the sidebar link needs to render. */
 export interface SidebarCollection {

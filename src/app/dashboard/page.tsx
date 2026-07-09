@@ -8,8 +8,8 @@ import {
   getRecentCollections,
 } from "@/lib/db/collections";
 import { getItemStats, getPinnedItems, getRecentItems } from "@/lib/db/items";
+import { RECENT_COLLECTIONS_LIMIT } from "@/lib/constants";
 
-const RECENT_COLLECTIONS_LIMIT = 6;
 const RECENT_ITEMS_LIMIT = 10;
 
 export default async function DashboardPage() {
