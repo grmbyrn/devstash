@@ -9,6 +9,7 @@ import {
   getRecentCollections,
 } from "@/lib/db/collections";
 import { getSystemItemTypes } from "@/lib/db/items";
+import { RECENT_COLLECTIONS_LIMIT } from "@/lib/constants";
 
 const SIDEBAR_RECENT_LIMIT = 5;
 
@@ -17,11 +18,14 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [itemTypes, favorites, recents] = await Promise.all([
+  const [itemTypes, favorites, recentCollections] = await Promise.all([
     getSystemItemTypes(),
     getFavoriteCollections(),
-    getRecentCollections(SIDEBAR_RECENT_LIMIT),
+    // Fetch the same limit the page uses so the cached query is shared, then
+    // take the subset the sidebar renders.
+    getRecentCollections(RECENT_COLLECTIONS_LIMIT),
   ]);
+  const recents = recentCollections.slice(0, SIDEBAR_RECENT_LIMIT);
 
   return (
     <SidebarProvider>
