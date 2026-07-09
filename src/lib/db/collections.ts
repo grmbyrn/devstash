@@ -30,6 +30,10 @@ export interface CollectionWithMeta {
  *
  * Wrapped in React's `cache()` so the sidebar (layout) and the main grid (page)
  * share a single DB round trip per request as long as they pass the same limit.
+ *
+ * Note: `cache()` keys on the *raw arguments*, not the resolved default — so any
+ * new caller must pass `RECENT_COLLECTIONS_LIMIT` explicitly to share the cache;
+ * calling `getRecentCollections()` with no args creates a separate entry.
  */
 export const getRecentCollections = cache(async function getRecentCollections(
   limit = RECENT_COLLECTIONS_LIMIT,
