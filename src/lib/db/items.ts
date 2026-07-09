@@ -1,7 +1,5 @@
 import { prisma } from "@/lib/prisma";
-
-// No auth yet — all dashboard data belongs to the seeded demo user.
-const DEMO_USER_EMAIL = "demo@devstash.io";
+import { DEMO_USER_EMAIL } from "@/lib/constants";
 
 /** The item type metadata a card needs to render its icon and accent. */
 export interface ItemTypeSummary {
