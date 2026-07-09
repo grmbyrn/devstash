@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 import { PrismaClient } from "../src/generated/prisma/client";
+import { DEMO_USER_EMAIL } from "../src/lib/constants";
 
 const SYSTEM_TYPES = [
   { name: "snippet", icon: "Code", color: "#3b82f6" },
@@ -304,7 +305,7 @@ async function main() {
   // ── Demo user ─────────────────────────────────────────────────────────
   const passwordHash = await bcrypt.hash("12345678", 12);
   const user = await prisma.user.upsert({
-    where: { email: "demo@devstash.io" },
+    where: { email: DEMO_USER_EMAIL },
     update: {
       name: "Demo User",
       isPro: false,
@@ -312,7 +313,7 @@ async function main() {
       password: passwordHash,
     },
     create: {
-      email: "demo@devstash.io",
+      email: DEMO_USER_EMAIL,
       name: "Demo User",
       isPro: false,
       emailVerified: new Date(),
