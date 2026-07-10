@@ -15,6 +15,9 @@ import type { NextAuthConfig } from "next-auth";
  * the default sign-in page know the provider exists.
  */
 export default {
+  pages: {
+    signIn: "/sign-in",
+  },
   providers: [
     GitHub,
     Credentials({

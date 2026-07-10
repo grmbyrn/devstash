@@ -9,16 +9,17 @@ import type {
 } from "@/lib/db/collections";
 import type { ItemTypeSummary } from "@/lib/db/items";
 import { Badge } from "@/components/ui/badge";
-import { currentUser } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 import { ItemTypeIcon } from "./item-type-icon";
 import { useSidebar } from "./sidebar-provider";
+import { UserMenu, type SidebarUser } from "./user-menu";
 
 export interface SidebarData {
   itemTypes: ItemTypeSummary[];
   favorites: SidebarCollection[];
   recents: CollectionWithMeta[];
+  user: SidebarUser;
 }
 
 /** Item types gated behind Pro in production. */
@@ -38,7 +39,7 @@ export function SidebarContent({
   const { setMobileOpen } = useSidebar();
   const onNavigate = () => setMobileOpen(false);
 
-  const { itemTypes, favorites, recents } = data;
+  const { itemTypes, favorites, recents, user } = data;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -128,7 +129,7 @@ export function SidebarContent({
         </Section>
       </nav>
 
-      <UserFooter compact={compact} />
+      <UserMenu user={user} compact={compact} />
     </div>
   );
 }
@@ -199,34 +200,3 @@ function NavItem({
   );
 }
 
-function UserFooter({ compact }: { compact: boolean }) {
-  const initials = currentUser.name
-    .split(" ")
-    .map((p) => p[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-2 border-t border-border p-3",
-        compact && "justify-center",
-      )}
-    >
-      <div className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-        {initials}
-      </div>
-      {!compact && (
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">
-            {currentUser.name}
-          </div>
-          <div className="truncate text-xs text-muted-foreground">
-            {currentUser.email}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}

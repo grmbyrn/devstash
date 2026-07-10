@@ -10,6 +10,7 @@ import {
 } from "@/lib/db/collections";
 import { getSystemItemTypes } from "@/lib/db/items";
 import { RECENT_COLLECTIONS_LIMIT } from "@/lib/constants";
+import { auth } from "@/auth";
 
 const SIDEBAR_RECENT_LIMIT = 5;
 
@@ -18,7 +19,8 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [itemTypes, favorites, recentCollections] = await Promise.all([
+  const [session, itemTypes, favorites, recentCollections] = await Promise.all([
+    auth(),
     getSystemItemTypes(),
     getFavoriteCollections(),
     // Fetch the same limit the page uses so the cached query is shared, then
@@ -26,11 +28,16 @@ export default async function DashboardLayout({
     getRecentCollections(RECENT_COLLECTIONS_LIMIT),
   ]);
   const recents = recentCollections.slice(0, SIDEBAR_RECENT_LIMIT);
+  const user = {
+    name: session?.user?.name,
+    email: session?.user?.email,
+    image: session?.user?.image,
+  };
 
   return (
     <SidebarProvider>
       <div className="flex min-h-screen">
-        <Sidebar data={{ itemTypes, favorites, recents }} />
+        <Sidebar data={{ itemTypes, favorites, recents, user }} />
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur">
             <SidebarTrigger />
