@@ -29,6 +29,10 @@ const credentialsProvider = Credentials({
     const passwordMatches = await bcrypt.compare(password, user.password);
     if (!passwordMatches) return null;
 
+    // Credentials accounts must confirm their email before signing in. The
+    // sign-in action distinguishes this from a bad password (see auth actions).
+    if (!user.emailVerified) return null;
+
     return {
       id: user.id,
       name: user.name,
