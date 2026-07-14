@@ -7,6 +7,17 @@ import { sendVerificationEmail } from "@/lib/email/verification";
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * Master switch for the whole email-verification flow. It's **off** unless
+ * `EMAIL_VERIFICATION_ENABLED` is exactly `"true"`, so a deploy without a
+ * Resend-verified sender domain never locks users out of registering or signing
+ * in. Consulted by register, the credentials sign-in gate, and the auth actions
+ * so both modes stay in lockstep.
+ */
+export function isEmailVerificationEnabled(): boolean {
+  return process.env.EMAIL_VERIFICATION_ENABLED === "true";
+}
+
+/**
  * Hash the token before it touches the database, so a DB leak never exposes a
  * usable link. The raw token only ever lives in the emailed URL.
  */
