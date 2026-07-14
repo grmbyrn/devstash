@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import authConfig from "@/auth.config";
 import { signInSchema } from "@/lib/validations/auth";
+import { isEmailVerificationEnabled } from "@/lib/auth/verification";
 
 /**
  * Real Credentials provider: validates the submitted email/password against the
@@ -29,9 +30,10 @@ const credentialsProvider = Credentials({
     const passwordMatches = await bcrypt.compare(password, user.password);
     if (!passwordMatches) return null;
 
-    // Credentials accounts must confirm their email before signing in. The
-    // sign-in action distinguishes this from a bad password (see auth actions).
-    if (!user.emailVerified) return null;
+    // Credentials accounts must confirm their email before signing in — unless
+    // the verification system is switched off, in which case the gate is a
+    // no-op. The sign-in action distinguishes this from a bad password.
+    if (isEmailVerificationEnabled() && !user.emailVerified) return null;
 
     return {
       id: user.id,
