@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 
 import { prisma } from "@/lib/prisma";
 import { registerSchema } from "@/lib/validations/auth";
+import { issueEmailVerification } from "@/lib/auth/verification";
 
 export type RegisterResult =
   | {
@@ -42,6 +43,14 @@ export async function registerUser(input: unknown): Promise<RegisterResult> {
     data: { name, email, password: passwordHash },
     select: { id: true, name: true, email: true },
   });
+
+  // Send the verification email. A send failure shouldn't fail registration —
+  // the account exists and the user can request a fresh link from sign-in.
+  try {
+    await issueEmailVerification(user.email!, user.name);
+  } catch (error) {
+    console.error("Failed to send verification email on register:", error);
+  }
 
   return { success: true, data: user };
 }
