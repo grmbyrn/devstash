@@ -4,7 +4,9 @@ import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 
 import { signIn, signOut as nextAuthSignOut } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { registerUser } from "@/lib/auth/register";
+import { issueEmailVerification } from "@/lib/auth/verification";
 
 const DASHBOARD = "/dashboard";
 
@@ -32,10 +34,48 @@ export async function signInWithCredentials(formData: FormData) {
     await signIn("credentials", { email, password, redirectTo: DASHBOARD });
   } catch (error) {
     if (error instanceof AuthError) {
+      // `authorize` blocks unverified accounts the same way it blocks a bad
+      // password (returns null). Re-check here so we can steer unverified users
+      // to the resend flow instead of showing "invalid email or password".
+      const user = await prisma.user.findUnique({
+        where: { email },
+        select: { password: true, emailVerified: true },
+      });
+      if (user?.password && !user.emailVerified) {
+        redirect(
+          `/sign-in?error=EmailNotVerified&email=${encodeURIComponent(email)}`,
+        );
+      }
       redirect("/sign-in?error=CredentialsSignin");
     }
     throw error;
   }
+}
+
+/**
+ * Re-issue a verification email. Always redirects to the same confirmation
+ * regardless of whether the address maps to an unverified account, so the form
+ * can't be used to probe which emails are registered.
+ */
+export async function resendVerification(formData: FormData) {
+  const email = String(formData.get("email") ?? "").trim();
+
+  if (email) {
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { name: true, email: true, password: true, emailVerified: true },
+    });
+    // Only credentials accounts that haven't verified yet get a new link.
+    if (user?.email && user.password && !user.emailVerified) {
+      try {
+        await issueEmailVerification(user.email, user.name);
+      } catch (error) {
+        console.error("Failed to resend verification email:", error);
+      }
+    }
+  }
+
+  redirect("/sign-in?resent=1");
 }
 
 /**
@@ -55,5 +95,5 @@ export async function register(formData: FormData) {
     redirect(`/register?error=${encodeURIComponent(result.error)}`);
   }
 
-  redirect("/sign-in?registered=1");
+  redirect("/sign-in?registered=1&verify=1");
 }

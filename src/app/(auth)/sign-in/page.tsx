@@ -4,7 +4,11 @@ import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { SubmitButton } from "@/components/auth/submit-button";
 import { GithubIcon } from "@/components/auth/github-icon";
-import { signInWithCredentials, signInWithGitHub } from "@/actions/auth";
+import {
+  resendVerification,
+  signInWithCredentials,
+  signInWithGitHub,
+} from "@/actions/auth";
 
 export const metadata: Metadata = {
   title: "Sign in · DevStash",
@@ -13,9 +17,18 @@ export const metadata: Metadata = {
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; registered?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    registered?: string;
+    verify?: string;
+    verified?: string;
+    resent?: string;
+    email?: string;
+  }>;
 }) {
-  const { error, registered } = await searchParams;
+  const { error, registered, verify, verified, resent, email } =
+    await searchParams;
+  const emailNotVerified = error === "EmailNotVerified";
 
   return (
     <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
@@ -28,8 +41,39 @@ export default async function SignInPage({
 
       {registered && (
         <p className="mb-4 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-500">
-          Account created. Sign in to continue.
+          {verify
+            ? "Account created. Check your email for a verification link before signing in."
+            : "Account created. Sign in to continue."}
         </p>
+      )}
+
+      {verified && (
+        <p className="mb-4 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-500">
+          Email verified. You can now sign in.
+        </p>
+      )}
+
+      {resent && (
+        <p className="mb-4 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-500">
+          If that email needs verifying, we&apos;ve sent a fresh link. Check your
+          inbox.
+        </p>
+      )}
+
+      {emailNotVerified && (
+        <div className="mb-4 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-500">
+          <p>Please verify your email before signing in.</p>
+          <form action={resendVerification} className="mt-2">
+            <input type="hidden" name="email" value={email ?? ""} />
+            <SubmitButton
+              variant="outline"
+              className="h-8 w-full text-xs"
+              pendingText="Sending…"
+            >
+              Resend verification email
+            </SubmitButton>
+          </form>
+        </div>
       )}
 
       <form action={signInWithGitHub}>
@@ -76,7 +120,7 @@ export default async function SignInPage({
           />
         </div>
 
-        {error && (
+        {error && !emailNotVerified && (
           <p role="alert" className="text-sm text-destructive">
             Invalid email or password.
           </p>
