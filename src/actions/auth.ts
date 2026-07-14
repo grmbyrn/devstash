@@ -6,7 +6,10 @@ import { redirect } from "next/navigation";
 import { signIn, signOut as nextAuthSignOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { registerUser } from "@/lib/auth/register";
-import { issueEmailVerification } from "@/lib/auth/verification";
+import {
+  isEmailVerificationEnabled,
+  issueEmailVerification,
+} from "@/lib/auth/verification";
 
 const DASHBOARD = "/dashboard";
 
@@ -37,14 +40,16 @@ export async function signInWithCredentials(formData: FormData) {
       // `authorize` blocks unverified accounts the same way it blocks a bad
       // password (returns null). Re-check here so we can steer unverified users
       // to the resend flow instead of showing "invalid email or password".
-      const user = await prisma.user.findUnique({
-        where: { email },
-        select: { password: true, emailVerified: true },
-      });
-      if (user?.password && !user.emailVerified) {
-        redirect(
-          `/sign-in?error=EmailNotVerified&email=${encodeURIComponent(email)}`,
-        );
+      if (isEmailVerificationEnabled()) {
+        const user = await prisma.user.findUnique({
+          where: { email },
+          select: { password: true, emailVerified: true },
+        });
+        if (user?.password && !user.emailVerified) {
+          redirect(
+            `/sign-in?error=EmailNotVerified&email=${encodeURIComponent(email)}`,
+          );
+        }
       }
       redirect("/sign-in?error=CredentialsSignin");
     }
@@ -60,7 +65,8 @@ export async function signInWithCredentials(formData: FormData) {
 export async function resendVerification(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
 
-  if (email) {
+  // Nothing to resend when the verification system is switched off.
+  if (email && isEmailVerificationEnabled()) {
     const user = await prisma.user.findUnique({
       where: { email },
       select: { name: true, email: true, password: true, emailVerified: true },
@@ -95,5 +101,11 @@ export async function register(formData: FormData) {
     redirect(`/register?error=${encodeURIComponent(result.error)}`);
   }
 
-  redirect("/sign-in?registered=1&verify=1");
+  // With verification on, tell the user to check their inbox; with it off the
+  // account is ready to use immediately.
+  redirect(
+    isEmailVerificationEnabled()
+      ? "/sign-in?registered=1&verify=1"
+      : "/sign-in?registered=1",
+  );
 }
