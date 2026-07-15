@@ -25,3 +25,25 @@ export const signInSchema = z.object({
   email: z.email(),
   password: z.string().min(1),
 });
+
+/**
+ * Payload for the "forgot password" form — just the address to email a reset
+ * link to.
+ */
+export const forgotPasswordSchema = z.object({
+  email: z.email("Enter a valid email address"),
+});
+
+/**
+ * Payload for the "reset password" form. `confirmPassword` must match `password`;
+ * the refinement surfaces the mismatch on that field. Mirrors `registerSchema`.
+ */
+export const resetPasswordSchema = z
+  .object({
+    password: z.string().min(8, "Password must be at least 8 characters"),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
