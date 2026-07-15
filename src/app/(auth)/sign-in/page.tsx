@@ -23,10 +23,11 @@ export default async function SignInPage({
     verify?: string;
     verified?: string;
     resent?: string;
+    reset?: string;
     email?: string;
   }>;
 }) {
-  const { error, registered, verify, verified, resent, email } =
+  const { error, registered, verify, verified, resent, reset, email } =
     await searchParams;
   const emailNotVerified = error === "EmailNotVerified";
 
@@ -50,6 +51,12 @@ export default async function SignInPage({
       {verified && (
         <p className="mb-4 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-500">
           Email verified. You can now sign in.
+        </p>
+      )}
+
+      {reset && (
+        <p className="mb-4 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-500">
+          Password updated. Sign in with your new password.
         </p>
       )}
 
@@ -107,9 +114,17 @@ export default async function SignInPage({
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="password" className="text-sm font-medium">
-            Password
-          </label>
+          <div className="flex items-center justify-between">
+            <label htmlFor="password" className="text-sm font-medium">
+              Password
+            </label>
+            <Link
+              href="/forgot-password"
+              className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
           <Input
             id="password"
             name="password"
