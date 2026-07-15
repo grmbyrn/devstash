@@ -10,6 +10,14 @@ import {
   isEmailVerificationEnabled,
   issueEmailVerification,
 } from "@/lib/auth/verification";
+import {
+  issuePasswordReset,
+  resetUserPassword,
+} from "@/lib/auth/password-reset";
+import {
+  forgotPasswordSchema,
+  resetPasswordSchema,
+} from "@/lib/validations/auth";
 
 const DASHBOARD = "/dashboard";
 
@@ -82,6 +90,63 @@ export async function resendVerification(formData: FormData) {
   }
 
   redirect("/sign-in?resent=1");
+}
+
+/**
+ * Send a password-reset link. Always redirects to the same confirmation whether
+ * or not the address maps to a credentials account, so the form can't be used to
+ * probe which emails are registered.
+ */
+export async function requestPasswordReset(formData: FormData) {
+  const email = String(formData.get("email") ?? "").trim();
+
+  const parsed = forgotPasswordSchema.safeParse({ email });
+  if (parsed.success) {
+    const user = await prisma.user.findUnique({
+      where: { email: parsed.data.email },
+      select: { name: true, email: true, password: true },
+    });
+    // Only accounts with a password (credentials sign-ups) can reset one;
+    // OAuth-only users have nothing to reset.
+    if (user?.email && user.password) {
+      try {
+        await issuePasswordReset(user.email, user.name);
+      } catch (error) {
+        console.error("Failed to send password reset email:", error);
+      }
+    }
+  }
+
+  redirect("/forgot-password?sent=1");
+}
+
+/**
+ * Set a new password from a reset link. Validation errors redirect back to the
+ * form (token preserved) with the message; a token that went bad between load and
+ * submit redirects to the invalid-link state. On success the token is burned and
+ * the user is sent to sign-in with a confirmation banner.
+ */
+export async function resetPassword(formData: FormData) {
+  const token = String(formData.get("token") ?? "");
+  const password = String(formData.get("password") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+  const parsed = resetPasswordSchema.safeParse({ password, confirmPassword });
+  if (!parsed.success) {
+    const message = parsed.error.issues[0]?.message ?? "Invalid input";
+    redirect(
+      `/reset-password?token=${encodeURIComponent(token)}&error=${encodeURIComponent(message)}`,
+    );
+  }
+
+  const result = await resetUserPassword(token, parsed.data.password);
+  if (!result.ok) {
+    // Token expired or was consumed between page load and submit — drop the
+    // token so the reset page renders the invalid-link state.
+    redirect(`/reset-password?error=${result.reason}`);
+  }
+
+  redirect("/sign-in?reset=1");
 }
 
 /**
