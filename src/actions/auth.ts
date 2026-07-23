@@ -18,6 +18,12 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
 } from "@/lib/validations/auth";
+import {
+  checkRateLimit,
+  getClientIp,
+  rateLimitMessage,
+  retryAfterMinutes,
+} from "@/lib/rate-limit";
 
 const DASHBOARD = "/dashboard";
 
@@ -40,6 +46,16 @@ export async function signOut() {
 export async function signInWithCredentials(formData: FormData) {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
+
+  // Rate limit by IP + email so brute forcing one account is throttled without
+  // one attacker blocking every account from a shared IP outright.
+  const ip = await getClientIp();
+  const limit = await checkRateLimit("login", `${ip}:${email.toLowerCase()}`);
+  if (!limit.success) {
+    redirect(
+      `/sign-in?error=RateLimited&retryMins=${retryAfterMinutes(limit.reset)}`,
+    );
+  }
 
   try {
     await signIn("credentials", { email, password, redirectTo: DASHBOARD });
@@ -73,6 +89,18 @@ export async function signInWithCredentials(formData: FormData) {
 export async function resendVerification(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
 
+  // Throttle by IP + email to curb inbox-flooding a single address.
+  const ip = await getClientIp();
+  const limit = await checkRateLimit(
+    "resendVerification",
+    `${ip}:${email.toLowerCase()}`,
+  );
+  if (!limit.success) {
+    redirect(
+      `/sign-in?error=RateLimited&retryMins=${retryAfterMinutes(limit.reset)}`,
+    );
+  }
+
   // Nothing to resend when the verification system is switched off.
   if (email && isEmailVerificationEnabled()) {
     const user = await prisma.user.findUnique({
@@ -99,6 +127,16 @@ export async function resendVerification(formData: FormData) {
  */
 export async function requestPasswordReset(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
+
+  // IP-keyed — the limit doesn't depend on which account, so it can't be used to
+  // probe account existence (that's still guarded by the neutral confirmation).
+  const ip = await getClientIp();
+  const limit = await checkRateLimit("forgotPassword", ip);
+  if (!limit.success) {
+    redirect(
+      `/forgot-password?error=${encodeURIComponent(rateLimitMessage(limit.reset))}`,
+    );
+  }
 
   const parsed = forgotPasswordSchema.safeParse({ email });
   if (parsed.success) {
@@ -131,6 +169,16 @@ export async function resetPassword(formData: FormData) {
   const password = String(formData.get("password") ?? "");
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
+  // IP-keyed — throttles guessing/replaying reset tokens. Preserve the token so a
+  // legitimate user just sees the message and can retry once the window clears.
+  const ip = await getClientIp();
+  const limit = await checkRateLimit("resetPassword", ip);
+  if (!limit.success) {
+    redirect(
+      `/reset-password?token=${encodeURIComponent(token)}&error=${encodeURIComponent(rateLimitMessage(limit.reset))}`,
+    );
+  }
+
   const parsed = resetPasswordSchema.safeParse({ password, confirmPassword });
   if (!parsed.success) {
     const message = parsed.error.issues[0]?.message ?? "Invalid input";
@@ -155,6 +203,13 @@ export async function resetPassword(formData: FormData) {
  * server-rendered page can display it.
  */
 export async function register(formData: FormData) {
+  // IP-keyed — throttles automated sign-up spam / account-creation abuse.
+  const ip = await getClientIp();
+  const limit = await checkRateLimit("register", ip);
+  if (!limit.success) {
+    redirect(`/register?error=${encodeURIComponent(rateLimitMessage(limit.reset))}`);
+  }
+
   const result = await registerUser({
     name: String(formData.get("name") ?? ""),
     email: String(formData.get("email") ?? ""),

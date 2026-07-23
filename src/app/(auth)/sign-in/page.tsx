@@ -25,11 +25,13 @@ export default async function SignInPage({
     resent?: string;
     reset?: string;
     email?: string;
+    retryMins?: string;
   }>;
 }) {
-  const { error, registered, verify, verified, resent, reset, email } =
+  const { error, registered, verify, verified, resent, reset, email, retryMins } =
     await searchParams;
   const emailNotVerified = error === "EmailNotVerified";
+  const rateLimited = error === "RateLimited";
 
   return (
     <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
@@ -64,6 +66,16 @@ export default async function SignInPage({
         <p className="mb-4 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-500">
           If that email needs verifying, we&apos;ve sent a fresh link. Check your
           inbox.
+        </p>
+      )}
+
+      {rateLimited && (
+        <p
+          role="alert"
+          className="mb-4 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-500"
+        >
+          Too many attempts. Please try again in {retryMins ?? "a few"} minute
+          {retryMins === "1" ? "" : "s"}.
         </p>
       )}
 
@@ -135,7 +147,7 @@ export default async function SignInPage({
           />
         </div>
 
-        {error && !emailNotVerified && (
+        {error && !emailNotVerified && !rateLimited && (
           <p role="alert" className="text-sm text-destructive">
             Invalid email or password.
           </p>

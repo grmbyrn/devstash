@@ -12,9 +12,9 @@ export const metadata: Metadata = {
 export default async function ForgotPasswordPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sent?: string }>;
+  searchParams: Promise<{ sent?: string; error?: string }>;
 }) {
-  const { sent } = await searchParams;
+  const { sent, error } = await searchParams;
 
   // Neutral confirmation shown regardless of whether the address is registered,
   // so the form can't be used to enumerate accounts.
@@ -68,6 +68,12 @@ export default async function ForgotPasswordPage({
             required
           />
         </div>
+
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
 
         <SubmitButton className="w-full" pendingText="Sending…">
           Send reset link
