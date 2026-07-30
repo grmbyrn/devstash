@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import { prisma } from "@/lib/prisma";
 import { DEMO_USER_EMAIL } from "@/lib/constants";
 
@@ -96,6 +98,30 @@ export async function getRecentItems(limit = 10): Promise<ItemWithMeta[]> {
   return rows.map(toItemWithMeta);
 }
 
+/**
+ * Every item of one type belonging to one user, for the `/items/[type]` list.
+ * Unlike the dashboard helpers above (still scoped to the seeded demo user),
+ * this keys off the real `userId` from the session — same approach as
+ * `getProfileStats`. Pinned items lead, then most recently used, falling back to
+ * `updatedAt` for items that have never been opened.
+ */
+export async function getItemsByType(
+  userId: string,
+  itemTypeId: string,
+): Promise<ItemWithMeta[]> {
+  const rows = await prisma.item.findMany({
+    where: { userId, itemTypeId },
+    orderBy: [
+      { isPinned: "desc" },
+      { lastUsedAt: { sort: "desc", nulls: "last" } },
+      { updatedAt: "desc" },
+    ],
+    select: itemCardSelect,
+  });
+
+  return rows.map(toItemWithMeta);
+}
+
 // Canonical display order for the seeded system types; anything unknown
 // (e.g. future custom types) sorts to the end.
 const SYSTEM_TYPE_ORDER = [
@@ -108,8 +134,16 @@ const SYSTEM_TYPE_ORDER = [
   "image",
 ];
 
-/** The system item types for the sidebar type list, in canonical order. */
-export async function getSystemItemTypes(): Promise<ItemTypeSummary[]> {
+/**
+ * The system item types for the sidebar type list, in canonical order.
+ *
+ * Wrapped in React's `cache()` so the layout's sidebar, the `/items/[type]`
+ * page and its `generateMetadata` all share one query per request — takes no
+ * arguments, so every caller hits the same cache entry.
+ */
+export const getSystemItemTypes = cache(async function getSystemItemTypes(): Promise<
+  ItemTypeSummary[]
+> {
   const types = await prisma.itemType.findMany({
     where: { isSystem: true },
     select: { id: true, name: true, icon: true, color: true },
@@ -123,7 +157,7 @@ export async function getSystemItemTypes(): Promise<ItemTypeSummary[]> {
       (rankB === -1 ? SYSTEM_TYPE_ORDER.length : rankB)
     );
   });
-}
+});
 
 /** Aggregate item stats for the demo user's dashboard stat cards. */
 export async function getItemStats(): Promise<{
