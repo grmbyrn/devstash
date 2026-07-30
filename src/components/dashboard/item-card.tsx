@@ -32,9 +32,14 @@ export function ItemCard({ item }: { item: ItemWithMeta }) {
       </div>
 
       {preview && (
-        <pre className="line-clamp-3 whitespace-pre-wrap break-words rounded-md bg-muted/50 px-2 py-1.5 font-mono text-[11px] leading-snug text-muted-foreground">
-          {preview}
-        </pre>
+        // The padding lives on the wrapper, not the clamped element: `overflow`
+        // clips at the padding box, so padding on the <pre> itself would let a
+        // sliver of the 4th line bleed into the gap below the clamp.
+        <div className="rounded-md bg-muted/50 px-2 py-1.5">
+          <pre className="line-clamp-3 whitespace-pre-wrap break-words font-mono text-[11px] leading-snug text-muted-foreground">
+            {preview}
+          </pre>
+        </div>
       )}
 
       {item.tags.length > 0 && (

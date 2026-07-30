@@ -9,6 +9,7 @@ import type {
 } from "@/lib/db/collections";
 import type { ItemTypeSummary } from "@/lib/db/items";
 import { Badge } from "@/components/ui/badge";
+import { typeLabel, typeSlug } from "@/lib/item-types";
 import { cn } from "@/lib/utils";
 
 import { ItemTypeIcon } from "./item-type-icon";
@@ -24,10 +25,6 @@ export interface SidebarData {
 
 /** Item types gated behind Pro in production. */
 const PRO_TYPES = new Set(["file", "image"]);
-
-function titleCase(s: string) {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
 
 export function SidebarContent({
   data,
@@ -59,8 +56,8 @@ export function SidebarContent({
           {itemTypes.map((type) => (
             <NavItem
               key={type.id}
-              href={`/items/${type.name}s`}
-              label={`${titleCase(type.name)}s`}
+              href={`/items/${typeSlug(type.name)}`}
+              label={typeLabel(type.name)}
               icon={
                 <ItemTypeIcon name={type.icon} className="size-4 shrink-0" />
               }
