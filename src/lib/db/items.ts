@@ -204,30 +204,33 @@ export interface ItemDetail extends ItemWithMeta {
  * Dates are serialized to ISO strings because this crosses the network to a
  * client component, where `Date` instances do not survive JSON.
  */
-export async function getItemById(
-  userId: string,
-  id: string,
-): Promise<ItemDetail | null> {
-  const row = await prisma.item.findFirst({
-    where: { id, userId },
-    select: {
-      ...itemCardSelect,
-      contentType: true,
-      fileUrl: true,
-      fileName: true,
-      fileSize: true,
-      createdAt: true,
-      updatedAt: true,
-      lastUsedAt: true,
-      collections: {
-        orderBy: { addedAt: "asc" },
-        select: { collection: { select: { id: true, name: true } } },
-      },
-    },
-  });
+const itemDetailSelect = {
+  ...itemCardSelect,
+  contentType: true,
+  fileUrl: true,
+  fileName: true,
+  fileSize: true,
+  createdAt: true,
+  updatedAt: true,
+  lastUsedAt: true,
+  collections: {
+    orderBy: { addedAt: "asc" },
+    select: { collection: { select: { id: true, name: true } } },
+  },
+} as const;
 
-  if (!row) return null;
+type ItemDetailRow = ItemCardRow & {
+  contentType: ContentType;
+  fileUrl: string | null;
+  fileName: string | null;
+  fileSize: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+  lastUsedAt: Date | null;
+  collections: { collection: ItemCollectionSummary }[];
+};
 
+function toItemDetail(row: ItemDetailRow): ItemDetail {
   return {
     ...toItemWithMeta(row),
     contentType: row.contentType,
@@ -239,4 +242,100 @@ export async function getItemById(
     updatedAt: row.updatedAt.toISOString(),
     lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
   };
+}
+
+export async function getItemById(
+  userId: string,
+  id: string,
+): Promise<ItemDetail | null> {
+  const row = await prisma.item.findFirst({
+    where: { id, userId },
+    select: itemDetailSelect,
+  });
+
+  if (!row) return null;
+
+  return toItemDetail(row);
+}
+
+/** The columns `updateItem` may write. Absent keys are left untouched. */
+export interface UpdateItemData {
+  title: string;
+  description?: string | null;
+  content?: string | null;
+  language?: string | null;
+  url?: string | null;
+  tags?: string[];
+}
+
+/**
+ * Apply an edit to one item and return its refreshed detail.
+ *
+ * Ownership is enforced the same way `getItemById` does it — `userId` sits in
+ * the `where` clause rather than being checked after a read — so another user's
+ * item is never updated and is reported as simply absent (`null`), which the
+ * caller turns into a "not found" without revealing that the id exists.
+ *
+ * Tags are replaced wholesale: the join rows are deleted and recreated,
+ * connecting to existing `Tag` rows by name or creating them. `Tag` is global
+ * and shared across users, so `connectOrCreate` is what keeps one name to one
+ * row. Tags left with no items are not cleaned up here.
+ *
+ * The write and the tag replacement are one nested Prisma call, so a failure
+ * part-way cannot leave the item updated with its old tags.
+ */
+export async function updateItem(
+  userId: string,
+  id: string,
+  data: UpdateItemData,
+): Promise<ItemDetail | null> {
+  const { tags, ...fields } = data;
+
+  // Only keys actually present are written, so a payload that omits `url`
+  // leaves the existing value alone instead of nulling it.
+  const scalars = Object.fromEntries(
+    Object.entries(fields).filter(([, value]) => value !== undefined),
+  );
+
+  try {
+    const row = await prisma.item.update({
+      // `id` alone is unique; `userId` narrows it so a foreign item matches
+      // nothing and Prisma raises P2025 rather than writing.
+      where: { id, userId },
+      data: {
+        ...scalars,
+        ...(tags
+          ? {
+              tags: {
+                deleteMany: {},
+                create: tags.map((name) => ({
+                  tag: {
+                    connectOrCreate: { where: { name }, create: { name } },
+                  },
+                })),
+              },
+            }
+          : {}),
+      },
+      select: itemDetailSelect,
+    });
+
+    return toItemDetail(row);
+  } catch (error) {
+    // P2025 is "record to update not found" — either the id is unknown or it
+    // belongs to someone else. Both are reported as absent, so the caller
+    // cannot tell them apart. Anything else is a real failure worth raising.
+    if (isRecordNotFound(error)) return null;
+    throw error;
+  }
+}
+
+/** True for Prisma's "record not found" error, without importing its namespace. */
+function isRecordNotFound(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "P2025"
+  );
 }

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ItemDrawerProvider } from "@/components/dashboard/item-drawer-provider";
 import { Sidebar, SidebarTrigger } from "@/components/dashboard/sidebar";
+import { Toaster } from "@/components/ui/sonner";
 import { SidebarProvider } from "@/components/dashboard/sidebar-provider";
 import {
   getFavoriteCollections,
@@ -71,6 +72,7 @@ export default async function DashboardLayout({
           </main>
         </div>
       </div>
+      <Toaster />
     </SidebarProvider>
   );
 }
