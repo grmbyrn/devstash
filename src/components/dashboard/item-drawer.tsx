@@ -103,7 +103,14 @@ export function ItemDrawer({
                 onCancel={() => setEditingId(null)}
                 onSaved={(updated) => {
                   onSaved(updated);
-                  setEditingId(null);
+                  // A save can resolve after the drawer has moved on (closing
+                  // mid-save is possible — Escape isn't blocked while saving),
+                  // so only leave edit mode if this is still the item being
+                  // edited. Otherwise a stale completion would kick the user
+                  // out of an edit they have since started on another card.
+                  setEditingId((current) =>
+                    current === updated.id ? null : current,
+                  );
                 }}
               />
             ) : (

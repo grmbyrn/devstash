@@ -86,7 +86,12 @@ export function ItemDrawerProvider({
    * otherwise show the old title if this item were reopened.
    */
   const handleSaved = React.useCallback((updated: ItemDetail) => {
-    setDetail(updated);
+    // Both setters are guarded on the id: a save that resolves after the drawer
+    // has moved to another item (close mid-save, then open a different card)
+    // must not replace the newer item's state with the older save's result.
+    setDetail((current) =>
+      current && current.id === updated.id ? updated : current,
+    );
     setPreview((current) =>
       current && current.id === updated.id ? { ...current, ...updated } : current,
     );
