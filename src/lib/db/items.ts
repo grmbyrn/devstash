@@ -1,7 +1,7 @@
 import { cache } from "react";
+import type { ContentType } from "@/generated/prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { DEMO_USER_EMAIL } from "@/lib/constants";
 
 /** The item type metadata a card needs to render its icon and accent. */
 export interface ItemTypeSummary {
@@ -69,10 +69,10 @@ function toItemWithMeta(row: ItemCardRow): ItemWithMeta {
   };
 }
 
-/** The demo user's pinned items, most recently updated first. */
-export async function getPinnedItems(): Promise<ItemWithMeta[]> {
+/** A user's pinned items, most recently updated first. */
+export async function getPinnedItems(userId: string): Promise<ItemWithMeta[]> {
   const rows = await prisma.item.findMany({
-    where: { user: { email: DEMO_USER_EMAIL }, isPinned: true },
+    where: { userId, isPinned: true },
     orderBy: { updatedAt: "desc" },
     select: itemCardSelect,
   });
@@ -81,12 +81,15 @@ export async function getPinnedItems(): Promise<ItemWithMeta[]> {
 }
 
 /**
- * The demo user's most recently used items. Falls back to `updatedAt` for items
- * that have never been opened (no `lastUsedAt`), so freshly seeded data surfaces.
+ * A user's most recently used items. Falls back to `updatedAt` for items that
+ * have never been opened (no `lastUsedAt`), so freshly seeded data surfaces.
  */
-export async function getRecentItems(limit = 10): Promise<ItemWithMeta[]> {
+export async function getRecentItems(
+  userId: string,
+  limit = 10,
+): Promise<ItemWithMeta[]> {
   const rows = await prisma.item.findMany({
-    where: { user: { email: DEMO_USER_EMAIL } },
+    where: { userId },
     orderBy: [
       { lastUsedAt: { sort: "desc", nulls: "last" } },
       { updatedAt: "desc" },
@@ -100,10 +103,8 @@ export async function getRecentItems(limit = 10): Promise<ItemWithMeta[]> {
 
 /**
  * Every item of one type belonging to one user, for the `/items/[type]` list.
- * Unlike the dashboard helpers above (still scoped to the seeded demo user),
- * this keys off the real `userId` from the session — same approach as
- * `getProfileStats`. Pinned items lead, then most recently used, falling back to
- * `updatedAt` for items that have never been opened.
+ * Pinned items lead, then most recently used, falling back to `updatedAt` for
+ * items that have never been opened.
  */
 export async function getItemsByType(
   userId: string,
@@ -159,17 +160,83 @@ export const getSystemItemTypes = cache(async function getSystemItemTypes(): Pro
   });
 });
 
-/** Aggregate item stats for the demo user's dashboard stat cards. */
-export async function getItemStats(): Promise<{
+/** Aggregate item stats for a user's dashboard stat cards. */
+export async function getItemStats(userId: string): Promise<{
   total: number;
   favorites: number;
 }> {
   const [total, favorites] = await Promise.all([
-    prisma.item.count({ where: { user: { email: DEMO_USER_EMAIL } } }),
-    prisma.item.count({
-      where: { user: { email: DEMO_USER_EMAIL }, isFavorite: true },
-    }),
+    prisma.item.count({ where: { userId } }),
+    prisma.item.count({ where: { userId, isFavorite: true } }),
   ]);
 
   return { total, favorites };
+}
+
+/** A collection an item belongs to, reduced to what the drawer renders. */
+export interface ItemCollectionSummary {
+  id: string;
+  name: string;
+}
+
+/**
+ * The full detail the item drawer renders: everything a card shows plus the
+ * body content, file metadata, the collections it belongs to, and timestamps.
+ */
+export interface ItemDetail extends ItemWithMeta {
+  contentType: ContentType;
+  fileUrl: string | null;
+  fileName: string | null;
+  fileSize: number | null;
+  collections: ItemCollectionSummary[];
+  createdAt: string;
+  updatedAt: string;
+  lastUsedAt: string | null;
+}
+
+/**
+ * One item's full detail, for `GET /api/items/[id]`.
+ *
+ * Scoped to `userId` in the `where` clause rather than fetched then checked, so
+ * another user's item is simply absent — the route turns that into a 404, which
+ * never reveals whether the id exists at all.
+ *
+ * Dates are serialized to ISO strings because this crosses the network to a
+ * client component, where `Date` instances do not survive JSON.
+ */
+export async function getItemById(
+  userId: string,
+  id: string,
+): Promise<ItemDetail | null> {
+  const row = await prisma.item.findFirst({
+    where: { id, userId },
+    select: {
+      ...itemCardSelect,
+      contentType: true,
+      fileUrl: true,
+      fileName: true,
+      fileSize: true,
+      createdAt: true,
+      updatedAt: true,
+      lastUsedAt: true,
+      collections: {
+        orderBy: { addedAt: "asc" },
+        select: { collection: { select: { id: true, name: true } } },
+      },
+    },
+  });
+
+  if (!row) return null;
+
+  return {
+    ...toItemWithMeta(row),
+    contentType: row.contentType,
+    fileUrl: row.fileUrl,
+    fileName: row.fileName,
+    fileSize: row.fileSize,
+    collections: row.collections.map((c) => c.collection),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
+  };
 }

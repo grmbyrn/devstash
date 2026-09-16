@@ -1,16 +1,24 @@
+"use client";
+
 import { Pin, Star } from "lucide-react";
 
 import type { ItemWithMeta } from "@/lib/db/items";
 
+import { useItemDrawer } from "./item-drawer-provider";
 import { ItemTypeIcon } from "./item-type-icon";
 
 export function ItemCard({ item }: { item: ItemWithMeta }) {
+  const { openItem } = useItemDrawer();
   const accent = item.type.color;
   const preview = item.content?.trim() ?? item.url ?? item.description ?? "";
 
   return (
-    <article
-      className="relative flex flex-col gap-2 rounded-lg border border-border bg-card/60 p-4 pl-5 transition-colors hover:bg-card"
+    // A button rather than a click handler on the article, so the card is
+    // reachable and activatable from the keyboard for free.
+    <button
+      type="button"
+      onClick={() => openItem(item)}
+      className="relative flex w-full flex-col gap-2 rounded-lg border border-border bg-card/60 p-4 pl-5 text-left transition-colors hover:bg-card focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       style={{ borderLeftWidth: 3, borderLeftColor: accent }}
     >
       <div className="flex items-start gap-2">
@@ -54,6 +62,6 @@ export function ItemCard({ item }: { item: ItemWithMeta }) {
           ))}
         </div>
       )}
-    </article>
+    </button>
   );
 }

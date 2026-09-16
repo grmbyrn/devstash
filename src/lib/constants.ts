@@ -1,4 +1,5 @@
-// No auth yet — all dashboard data belongs to the seeded demo user.
+// The seeded demo account. Only `prisma/seed.ts` uses this now — every query
+// under `src/lib/db/` is scoped to the signed-in user id.
 export const DEMO_USER_EMAIL = "demo@devstash.io";
 
 // How many recent collections the dashboard fetches. The sidebar renders a

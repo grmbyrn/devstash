@@ -24,7 +24,12 @@ export function Sidebar({ data }: { data: SidebarData }) {
       </aside>
 
       <Sheet open={isMobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="left" className="w-72 p-0 lg:hidden">
+        <SheetContent
+          side="left"
+          title="Navigation"
+          description="Browse item types and collections."
+          className="w-72 p-0 lg:hidden"
+        >
           <SidebarContent data={data} />
         </SheetContent>
       </Sheet>
