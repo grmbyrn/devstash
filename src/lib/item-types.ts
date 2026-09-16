@@ -25,3 +25,31 @@ export function findTypeBySlug<T extends { name: string }>(
 ): T | undefined {
   return types.find((type) => typeSlug(type.name) === slug);
 }
+
+/**
+ * Which body fields an item type actually uses.
+ *
+ * All types share title, description and tags; these three vary. Keeping the
+ * mapping here rather than as conditionals inside the editor means the drawer
+ * has one place to ask, and it can be tested without rendering anything.
+ *
+ * Unknown type names get none of the optional fields, so a custom type added
+ * later degrades to title/description/tags instead of showing a wrong editor.
+ */
+const TYPES_WITH_CONTENT = new Set(["snippet", "prompt", "command", "note"]);
+const TYPES_WITH_LANGUAGE = new Set(["snippet", "command"]);
+const TYPES_WITH_URL = new Set(["link"]);
+
+export interface EditableFields {
+  content: boolean;
+  language: boolean;
+  url: boolean;
+}
+
+export function editableFields(typeName: string): EditableFields {
+  return {
+    content: TYPES_WITH_CONTENT.has(typeName),
+    language: TYPES_WITH_LANGUAGE.has(typeName),
+    url: TYPES_WITH_URL.has(typeName),
+  };
+}

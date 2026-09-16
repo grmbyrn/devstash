@@ -1,5 +1,7 @@
 "use client";
 
+import * as React from "react";
+import { useRouter } from "next/navigation";
 import {
   Copy,
   ExternalLink,
@@ -10,10 +12,16 @@ import {
   Tag,
   Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 
+import { updateItem } from "@/actions/items";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import type { ItemDetail, ItemWithMeta } from "@/lib/db/items";
 import { formatFileSize, relativeTime } from "@/lib/format";
+import { editableFields } from "@/lib/item-types";
+import { parseTagInput } from "@/lib/validations/item";
 import { cn } from "@/lib/utils";
 
 import { ItemTypeIcon } from "./item-type-icon";
@@ -26,6 +34,8 @@ interface ItemDrawerProps {
   /** Full detail from `/api/items/[id]`; null while loading or on error. */
   detail: ItemDetail | null;
   error: string | null;
+  /** Hands a saved edit back to the provider, which owns `detail`. */
+  onSaved: (item: ItemDetail) => void;
 }
 
 export function ItemDrawer({
@@ -34,14 +44,28 @@ export function ItemDrawer({
   preview,
   detail,
   error,
+  onSaved,
 }: ItemDrawerProps) {
   // Detail supersedes the card data once it lands; until then the card's copy
   // fills the header so opening the drawer never flashes an empty shell.
   const item = detail ?? preview;
   const isLoading = !detail && !error;
 
+  // Edit mode is stored as *which item* is being edited, not a bare boolean, so
+  // switching cards leaves it behind automatically: the id no longer matches,
+  // and no effect is needed to reset it.
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const isEditing = detail !== null && editingId === detail.id;
+
+  function handleOpenChange(next: boolean) {
+    // Closing discards an in-progress edit, so reopening the same card starts
+    // in view mode rather than back in a stale form.
+    if (!next) setEditingId(null);
+    onOpenChange(next);
+  }
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent
         side="right"
         description="Item details"
@@ -70,19 +94,49 @@ export function ItemDrawer({
               </div>
             </header>
 
-            <ActionBar isFavorite={item.isFavorite} isPinned={item.isPinned} />
+            {isEditing && detail ? (
+              <ItemEditForm
+                // Remount per item, so the inputs re-seed from the new detail
+                // rather than holding the previous item's text.
+                key={detail.id}
+                item={detail}
+                onCancel={() => setEditingId(null)}
+                onSaved={(updated) => {
+                  onSaved(updated);
+                  // A save can resolve after the drawer has moved on (closing
+                  // mid-save is possible — Escape isn't blocked while saving),
+                  // so only leave edit mode if this is still the item being
+                  // edited. Otherwise a stale completion would kick the user
+                  // out of an edit they have since started on another card.
+                  setEditingId((current) =>
+                    current === updated.id ? null : current,
+                  );
+                }}
+              />
+            ) : (
+              <>
+                <ActionBar
+                  isFavorite={item.isFavorite}
+                  isPinned={item.isPinned}
+                  // Editing needs the full detail, which the card preview does
+                  // not carry, so the pencil waits for the fetch to land.
+                  canEdit={Boolean(detail)}
+                  onEdit={() => detail && setEditingId(detail.id)}
+                />
 
-            <div className="flex flex-col gap-5 p-4">
-              {error ? (
-                <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-                  {error}
-                </p>
-              ) : isLoading ? (
-                <DetailSkeleton />
-              ) : (
-                detail && <ItemBody item={detail} />
-              )}
-            </div>
+                <div className="flex flex-col gap-5 p-4">
+                  {error ? (
+                    <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                      {error}
+                    </p>
+                  ) : isLoading ? (
+                    <DetailSkeleton />
+                  ) : (
+                    detail && <ItemBody item={detail} />
+                  )}
+                </div>
+              </>
+            )}
           </>
         )}
       </SheetContent>
@@ -93,16 +147,19 @@ export function ItemDrawer({
 /**
  * Favorite / Pin / Copy / Edit / Delete.
  *
- * Every action is disabled for now — this pass builds the drawer's detail
- * display only, and the mutations behind these buttons land with the item
- * editing feature. Favorite and Pin still reflect the item's current state.
+ * Edit is live; the rest stay disabled until their own mutations land. Favorite
+ * and Pin still reflect the item's current state.
  */
 function ActionBar({
   isFavorite,
   isPinned,
+  canEdit,
+  onEdit,
 }: {
   isFavorite: boolean;
   isPinned: boolean;
+  canEdit: boolean;
+  onEdit: () => void;
 }) {
   return (
     <div className="flex items-center gap-1 border-b border-border px-3 py-2">
@@ -119,7 +176,13 @@ function ActionBar({
         active={isPinned}
       />
       <ActionButton icon={<Copy />} label="Copy" />
-      <ActionButton icon={<Pencil />} label="Edit" />
+      <ActionButton
+        icon={<Pencil />}
+        label="Edit"
+        onClick={onEdit}
+        disabled={!canEdit}
+        title={canEdit ? "Edit" : "Loading…"}
+      />
       <ActionButton
         icon={<Trash2 />}
         label="Delete"
@@ -129,24 +192,39 @@ function ActionBar({
   );
 }
 
+/**
+ * One action-bar button. Without an `onClick` it renders disabled and titled
+ * "coming soon", which is still true of every action but Edit.
+ */
 function ActionButton({
   icon,
   label,
   active = false,
   className,
+  onClick,
+  disabled,
+  title,
 }: {
   icon: React.ReactNode;
   label: string;
   active?: boolean;
   className?: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  title?: string;
 }) {
+  const isDisabled = disabled ?? !onClick;
+
   return (
     <button
       type="button"
-      disabled
-      title={`${label} — coming soon`}
+      onClick={onClick}
+      disabled={isDisabled}
+      title={title ?? `${label} — coming soon`}
       className={cn(
         "inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-muted-foreground disabled:opacity-60 [&_svg]:size-4 [&_svg]:shrink-0",
+        !isDisabled &&
+          "hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
         active && "text-foreground",
         className,
       )}
@@ -273,6 +351,228 @@ function DetailSkeleton() {
         <div className="h-3 w-24 animate-pulse rounded bg-muted" />
         <div className="h-5 w-32 animate-pulse rounded bg-muted" />
       </div>
+    </div>
+  );
+}
+
+/**
+ * Edit mode: the same drawer with its fields swapped for inputs.
+ *
+ * Which fields appear is driven by `editableFields`, and the payload carries
+ * exactly those keys — so saving a snippet never sends `url`, and the server
+ * leaves that column alone rather than clearing it.
+ *
+ * Controlled inputs with local state, no form library: the only validation here
+ * is the empty-title guard on Save, which is a convenience. The server action
+ * re-validates everything and is the source of truth.
+ */
+function ItemEditForm({
+  item,
+  onCancel,
+  onSaved,
+}: {
+  item: ItemDetail;
+  onCancel: () => void;
+  onSaved: (updated: ItemDetail) => void;
+}) {
+  const router = useRouter();
+  const fields = editableFields(item.type.name);
+
+  const [title, setTitle] = React.useState(item.title);
+  const [description, setDescription] = React.useState(item.description ?? "");
+  const [content, setContent] = React.useState(item.content ?? "");
+  const [language, setLanguage] = React.useState(item.language ?? "");
+  const [url, setUrl] = React.useState(item.url ?? "");
+  const [tagInput, setTagInput] = React.useState(item.tags.join(", "));
+  const [isSaving, setSaving] = React.useState(false);
+
+  const canSave = title.trim().length > 0 && !isSaving;
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!canSave) return;
+
+    setSaving(true);
+    try {
+      const result = await updateItem(item.id, {
+        title,
+        description,
+        tags: parseTagInput(tagInput),
+        ...(fields.content ? { content } : {}),
+        ...(fields.language ? { language } : {}),
+        ...(fields.url ? { url } : {}),
+      });
+
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+
+      onSaved(result.data);
+      toast.success("Item saved");
+      // Re-render the server components behind the drawer so the card grid
+      // picks up the new title, preview and tags.
+      router.refresh();
+    } catch {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+        <Button type="submit" size="sm" disabled={!canSave}>
+          {isSaving ? "Saving…" : "Save"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={onCancel}
+          disabled={isSaving}
+        >
+          Cancel
+        </Button>
+      </div>
+
+      <div className="flex flex-col gap-4 p-4">
+        <Field label="Title" htmlFor="item-title">
+          <Input
+            id="item-title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+            autoFocus
+          />
+        </Field>
+
+        <Field label="Description" htmlFor="item-description">
+          <Textarea
+            id="item-description"
+            rows={2}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </Field>
+
+        {fields.url && (
+          <Field label="URL" htmlFor="item-url">
+            {/* Deliberately not type="url": native validation would block
+                submit on its own terms, so the schema's message never reached
+                the user and errors arrived on two different surfaces.
+                `inputMode` keeps the URL keyboard on mobile. */}
+            <Input
+              id="item-url"
+              inputMode="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://example.com"
+            />
+          </Field>
+        )}
+
+        {fields.language && (
+          <Field label="Language" htmlFor="item-language">
+            <Input
+              id="item-language"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              placeholder="typescript"
+            />
+          </Field>
+        )}
+
+        {fields.content && (
+          <Field label="Content" htmlFor="item-content">
+            <Textarea
+              id="item-content"
+              rows={10}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className="font-mono text-xs"
+            />
+          </Field>
+        )}
+
+        <Field label="Tags" htmlFor="item-tags" hint="Separate with commas">
+          <Input
+            id="item-tags"
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            placeholder="react, hooks"
+          />
+        </Field>
+
+        {/* Shown, not editable — the type is fixed and collections are managed
+            separately. */}
+        <dl className="flex flex-col gap-1 border-t border-border pt-3 text-xs text-muted-foreground">
+          <Meta term="Type" value={item.type.name} />
+          <Meta
+            term="Collections"
+            value={
+              item.collections.length > 0
+                ? item.collections.map((c) => c.name).join(", ")
+                : "None"
+            }
+          />
+          <Meta term="Created" value={relativeTime(item.createdAt)} />
+          <Meta term="Updated" value={relativeTime(item.updatedAt)} />
+        </dl>
+      </div>
+    </form>
+  );
+}
+
+function Field({
+  label,
+  htmlFor,
+  hint,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label
+        htmlFor={htmlFor}
+        className="text-xs font-medium text-muted-foreground"
+      >
+        {label}
+        {hint && <span className="ml-1.5 font-normal opacity-70">({hint})</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Textarea styled to match `Input`, which shadcn's set doesn't include here.
+ */
+function Textarea({
+  className,
+  ...props
+}: React.ComponentProps<"textarea">) {
+  return (
+    <textarea
+      className={cn(
+        "flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+function Meta({ term, value }: { term: string; value: string }) {
+  return (
+    <div className="flex gap-2">
+      <dt className="w-24 shrink-0">{term}</dt>
+      <dd className="min-w-0 flex-1 truncate text-foreground">{value}</dd>
     </div>
   );
 }

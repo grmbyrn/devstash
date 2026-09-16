@@ -32,6 +32,7 @@ export const prismaMock = {
     groupBy: vi.fn(),
     findFirst: vi.fn(),
     findMany: vi.fn(),
+    update: vi.fn(),
   },
   collection: {
     count: vi.fn(),
