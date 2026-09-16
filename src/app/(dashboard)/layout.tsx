@@ -2,6 +2,7 @@ import { Plus, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ItemDrawerProvider } from "@/components/dashboard/item-drawer-provider";
 import { Sidebar, SidebarTrigger } from "@/components/dashboard/sidebar";
 import { SidebarProvider } from "@/components/dashboard/sidebar-provider";
 import {
@@ -11,6 +12,7 @@ import {
 import { getSystemItemTypes } from "@/lib/db/items";
 import { RECENT_COLLECTIONS_LIMIT } from "@/lib/constants";
 import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 
 const SIDEBAR_RECENT_LIMIT = 5;
 
@@ -19,19 +21,27 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [session, itemTypes, favorites, recentCollections] = await Promise.all([
-    auth(),
+  // The sidebar's collections are scoped to the signed-in user, so the session
+  // has to resolve before they can be fetched. Unauthenticated requests are
+  // already turned away by the proxy; this is the defense-in-depth case.
+  const session = await auth();
+  if (!session?.user?.id) {
+    redirect("/sign-in");
+  }
+  const userId = session.user.id;
+
+  const [itemTypes, favorites, recentCollections] = await Promise.all([
     getSystemItemTypes(),
-    getFavoriteCollections(),
-    // Fetch the same limit the page uses so the cached query is shared, then
+    getFavoriteCollections(userId),
+    // Fetch the same args the page uses so the cached query is shared, then
     // take the subset the sidebar renders.
-    getRecentCollections(RECENT_COLLECTIONS_LIMIT),
+    getRecentCollections(userId, RECENT_COLLECTIONS_LIMIT),
   ]);
   const recents = recentCollections.slice(0, SIDEBAR_RECENT_LIMIT);
   const user = {
-    name: session?.user?.name,
-    email: session?.user?.email,
-    image: session?.user?.image,
+    name: session.user.name,
+    email: session.user.email,
+    image: session.user.image,
   };
 
   return (
@@ -56,7 +66,9 @@ export default async function DashboardLayout({
               </Button>
             </div>
           </header>
-          <main className="flex-1 p-6">{children}</main>
+          <main className="flex-1 p-6">
+            <ItemDrawerProvider>{children}</ItemDrawerProvider>
+          </main>
         </div>
       </div>
     </SidebarProvider>

@@ -1,7 +1,7 @@
 import { cache } from "react";
 
 import { prisma } from "@/lib/prisma";
-import { DEMO_USER_EMAIL, RECENT_COLLECTIONS_LIMIT } from "@/lib/constants";
+import { RECENT_COLLECTIONS_LIMIT } from "@/lib/constants";
 
 /** A single item type present in a collection, with its display metadata. */
 export interface CollectionTypeSummary {
@@ -25,21 +25,22 @@ export interface CollectionWithMeta {
 }
 
 /**
- * Fetch the demo user's most recently updated collections, each enriched with
- * its item count and the item types it contains (ranked by frequency).
+ * Fetch a user's most recently updated collections, each enriched with its item
+ * count and the item types it contains (ranked by frequency).
  *
  * Wrapped in React's `cache()` so the sidebar (layout) and the main grid (page)
- * share a single DB round trip per request as long as they pass the same limit.
+ * share a single DB round trip per request as long as they pass the same args.
  *
  * Note: `cache()` keys on the *raw arguments*, not the resolved default — so any
  * new caller must pass `RECENT_COLLECTIONS_LIMIT` explicitly to share the cache;
- * calling `getRecentCollections()` with no args creates a separate entry.
+ * calling `getRecentCollections(userId)` with no limit creates a separate entry.
  */
 export const getRecentCollections = cache(async function getRecentCollections(
+  userId: string,
   limit = RECENT_COLLECTIONS_LIMIT,
 ): Promise<CollectionWithMeta[]> {
   const collections = await prisma.collection.findMany({
-    where: { user: { email: DEMO_USER_EMAIL } },
+    where: { userId },
     orderBy: { updatedAt: "desc" },
     take: limit,
     include: {
@@ -93,28 +94,27 @@ export interface SidebarCollection {
   name: string;
 }
 
-/** The demo user's favorite collections for the sidebar, newest first. */
+/** A user's favorite collections for the sidebar, newest first. */
 export async function getFavoriteCollections(
+  userId: string,
   limit = 10,
 ): Promise<SidebarCollection[]> {
   return prisma.collection.findMany({
-    where: { user: { email: DEMO_USER_EMAIL }, isFavorite: true },
+    where: { userId, isFavorite: true },
     orderBy: { updatedAt: "desc" },
     take: limit,
     select: { id: true, name: true },
   });
 }
 
-/** Aggregate collection stats for the demo user's dashboard stat cards. */
-export async function getCollectionStats(): Promise<{
+/** Aggregate collection stats for a user's dashboard stat cards. */
+export async function getCollectionStats(userId: string): Promise<{
   total: number;
   favorites: number;
 }> {
   const [total, favorites] = await Promise.all([
-    prisma.collection.count({ where: { user: { email: DEMO_USER_EMAIL } } }),
-    prisma.collection.count({
-      where: { user: { email: DEMO_USER_EMAIL }, isFavorite: true },
-    }),
+    prisma.collection.count({ where: { userId } }),
+    prisma.collection.count({ where: { userId, isFavorite: true } }),
   ]);
 
   return { total, favorites };

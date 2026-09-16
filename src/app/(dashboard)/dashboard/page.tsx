@@ -8,18 +8,21 @@ import {
   getRecentCollections,
 } from "@/lib/db/collections";
 import { getItemStats, getPinnedItems, getRecentItems } from "@/lib/db/items";
+import { requireUser } from "@/lib/auth/session";
 import { RECENT_COLLECTIONS_LIMIT } from "@/lib/constants";
 
 const RECENT_ITEMS_LIMIT = 10;
 
 export default async function DashboardPage() {
+  const user = await requireUser("/dashboard");
+
   const [recentCollections, collectionStats, itemStats, pinnedItems, recentItems] =
     await Promise.all([
-      getRecentCollections(RECENT_COLLECTIONS_LIMIT),
-      getCollectionStats(),
-      getItemStats(),
-      getPinnedItems(),
-      getRecentItems(RECENT_ITEMS_LIMIT),
+      getRecentCollections(user.id, RECENT_COLLECTIONS_LIMIT),
+      getCollectionStats(user.id),
+      getItemStats(user.id),
+      getPinnedItems(user.id),
+      getRecentItems(user.id, RECENT_ITEMS_LIMIT),
     ]);
 
   const stats = {

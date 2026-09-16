@@ -3,9 +3,10 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 /**
- * Unit tests only — server actions (`src/actions`) and utilities (`src/lib`).
- * Components are deliberately out of scope, so there's no jsdom/React setup here;
- * everything runs in a plain Node environment.
+ * Unit tests only — server actions (`src/actions`), utilities (`src/lib`) and
+ * API route handlers (`src/app/api`). Components are deliberately out of scope,
+ * so there's no jsdom/React setup here; everything runs in a plain Node
+ * environment.
  */
 export default defineConfig({
   test: {
@@ -23,6 +24,10 @@ export default defineConfig({
     restoreMocks: true,
     coverage: {
       provider: "v8",
+      // API route handlers ARE unit-tested (see src/app/api/**/route.test.ts)
+      // but are left out of this list on purpose: the v8 provider omits a route
+      // module that a test actually executed, and reports one it never loaded
+      // as 0%, so including them reports tested routes as untested.
       include: ["src/actions/**/*.ts", "src/lib/**/*.ts"],
       exclude: ["src/lib/mock-data.ts", "src/lib/prisma.ts"],
     },

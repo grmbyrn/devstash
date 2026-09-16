@@ -37,9 +37,9 @@ npm run test:coverage
 
 ### Scope
 
-- **In scope:** server actions (`src/actions/`) and utilities/helpers (`src/lib/`) — validation, auth/token logic, rate limiting, redirect targets, anything with branching or a security rule.
+- **In scope:** server actions (`src/actions/`), utilities/helpers (`src/lib/`) and API route handlers (`src/app/api/**/route.ts`) — validation, auth/token logic, rate limiting, redirect targets, anything with branching or a security rule.
 - **Out of scope:** React components and pages. There is no jsdom/React setup; UI is verified in the browser as part of step 4 of the workflow.
-- Thin Prisma query wrappers (`src/lib/db/`) and email templates are also skipped — they're mostly I/O with no logic of their own.
+- Thin Prisma query wrappers (`src/lib/db/`) and email templates are skipped by default — they're mostly I/O with no logic of their own. Two exceptions earn tests: a wrapper that **maps or reshapes** rows (e.g. `getItemById` serializing dates for the wire), and one whose `where` clause carries a **security rule** — every user-scoped read is guarded in `src/lib/db/scoping.test.ts`, so a query that loses its `userId` fails the suite rather than quietly showing one account another's data.
 
 ### Conventions
 
@@ -48,6 +48,8 @@ npm run test:coverage
 - Server actions signal their result by redirecting, so assert on the URL with `captureRedirect` from `src/test/redirect.ts`.
 - Vitest doesn't load `.env`; `vitest.setup.ts` supplies placeholder env. Use `vi.stubEnv` for anything a test depends on, and `vi.unstubAllEnvs()` in an `afterEach`.
 - Test the behaviour that matters (a password is hashed, an expired token is refused, an unknown email gets the same answer as a known one) — not implementation detail.
+- API routes: mock `@/auth` wholesale (its `next-auth` import will not resolve outside the Next runtime) and mock the `src/lib/db` helper the route calls, then import the handler and assert on the `Response` — status plus parsed body.
+- **Coverage does not count API routes.** The v8 provider omits a route module a test actually executed and reports an unexecuted one as 0%, so `coverage.include` deliberately lists only `src/actions` and `src/lib`. A route showing no coverage is not evidence it is untested — check for a `route.test.ts` beside it.
 
 ## Branching
 
