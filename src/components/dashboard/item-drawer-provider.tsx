@@ -44,8 +44,13 @@ export function ItemDrawerProvider({
   // clicked card can't overwrite the one the user is actually looking at.
   const requestRef = React.useRef(0);
 
+  // Which item the drawer is currently showing, readable without going through
+  // state — so a late-resolving mutation can check what is on screen *now*.
+  const openIdRef = React.useRef<string | null>(null);
+
   const openItem = React.useCallback((item: ItemWithMeta) => {
     const requestId = ++requestRef.current;
+    openIdRef.current = item.id;
 
     setPreview(item);
     setDetail(null);
@@ -76,6 +81,7 @@ export function ItemDrawerProvider({
     if (!open) {
       // Abandon any in-flight response for the card being closed.
       requestRef.current += 1;
+      openIdRef.current = null;
     }
   }, []);
 
@@ -97,6 +103,24 @@ export function ItemDrawerProvider({
     );
   }, []);
 
+  /**
+   * Close the drawer once the item it was showing has been deleted.
+   *
+   * Guarded on the id for the same reason `handleSaved` is: a delete that
+   * resolves after the drawer has moved to another card must not close the
+   * drawer out from under the item the user is now looking at.
+   */
+  const handleDeleted = React.useCallback((deletedId: string) => {
+    if (openIdRef.current !== deletedId) return;
+
+    setOpen(false);
+    setDetail(null);
+    setPreview(null);
+    // Abandon any in-flight detail fetch for the item that just went away.
+    requestRef.current += 1;
+    openIdRef.current = null;
+  }, []);
+
   const value = React.useMemo(() => ({ openItem }), [openItem]);
 
   return (
@@ -109,6 +133,7 @@ export function ItemDrawerProvider({
         detail={detail}
         error={error}
         onSaved={handleSaved}
+        onDeleted={handleDeleted}
       />
     </ItemDrawerContext.Provider>
   );
