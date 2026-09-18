@@ -54,6 +54,16 @@ describe("user scoping on dashboard queries", () => {
     );
   });
 
+  it("deleteItem scopes the delete to the user, not just the id", async () => {
+    prismaMock.item.delete.mockResolvedValue({ id: "item_1" });
+
+    await items.deleteItem(USER, "item_1");
+
+    expect(prismaMock.item.delete).toHaveBeenCalledWith({
+      where: { id: "item_1", userId: USER },
+    });
+  });
+
   it("getItemStats counts only the user's items", async () => {
     await items.getItemStats(USER);
 

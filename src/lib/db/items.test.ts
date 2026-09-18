@@ -6,7 +6,7 @@ vi.mock("@/lib/prisma", async () => ({
   prisma: (await import("@/test/prisma-mock")).prismaMock,
 }));
 
-const { getItemById, updateItem } = await import("./items");
+const { deleteItem, getItemById, updateItem } = await import("./items");
 
 /**
  * `src/lib/db` is normally out of unit-test scope (thin I/O), but `getItemById`
@@ -221,6 +221,53 @@ describe("updateItem", () => {
     );
 
     await expect(updateItem("user_1", "item_1", { title: "t" })).rejects.toThrow(
+      "connection refused",
+    );
+  });
+});
+
+/**
+ * Deletion is irreversible, so the ownership rule in the `where` clause is the
+ * only thing standing between a session and someone else's data.
+ */
+describe("deleteItem", () => {
+  beforeEach(() => {
+    prismaMock.item.delete.mockResolvedValue({ id: "item_1" });
+  });
+
+  it("scopes the delete to the requesting user, not just the id", async () => {
+    await deleteItem("user_1", "item_1");
+
+    expect(prismaMock.item.delete).toHaveBeenCalledWith({
+      where: { id: "item_1", userId: "user_1" },
+    });
+  });
+
+  it("reports success when the item was deleted", async () => {
+    await expect(deleteItem("user_1", "item_1")).resolves.toBe(true);
+  });
+
+  /**
+   * A foreign or unknown id matches nothing, so Prisma raises P2025. Both must
+   * report the same plain absence, so a delete cannot be used to probe which
+   * ids exist.
+   */
+  it("reports absence when the item is not the user's or does not exist", async () => {
+    prismaMock.item.delete.mockRejectedValue(
+      Object.assign(new Error("Record to delete does not exist."), {
+        code: "P2025",
+      }),
+    );
+
+    await expect(deleteItem("user_2", "item_1")).resolves.toBe(false);
+  });
+
+  it("rethrows a genuine database failure instead of masking it as not-found", async () => {
+    prismaMock.item.delete.mockRejectedValue(
+      Object.assign(new Error("connection refused"), { code: "P1001" }),
+    );
+
+    await expect(deleteItem("user_1", "item_1")).rejects.toThrow(
       "connection refused",
     );
   });

@@ -24,6 +24,7 @@ import { editableFields } from "@/lib/item-types";
 import { parseTagInput } from "@/lib/validations/item";
 import { cn } from "@/lib/utils";
 
+import { DeleteItemDialog } from "./delete-item-dialog";
 import { ItemTypeIcon } from "./item-type-icon";
 
 interface ItemDrawerProps {
@@ -36,6 +37,8 @@ interface ItemDrawerProps {
   error: string | null;
   /** Hands a saved edit back to the provider, which owns `detail`. */
   onSaved: (item: ItemDetail) => void;
+  /** Tells the provider an item is gone, so it can close the drawer. */
+  onDeleted: (id: string) => void;
 }
 
 export function ItemDrawer({
@@ -45,6 +48,7 @@ export function ItemDrawer({
   detail,
   error,
   onSaved,
+  onDeleted,
 }: ItemDrawerProps) {
   // Detail supersedes the card data once it lands; until then the card's copy
   // fills the header so opening the drawer never flashes an empty shell.
@@ -57,10 +61,20 @@ export function ItemDrawer({
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const isEditing = detail !== null && editingId === detail.id;
 
+  // The delete confirmation is keyed the same way, for the same reason: a
+  // confirm left open can never belong to a different item than the one on
+  // screen.
+  const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const isConfirmingDelete = detail !== null && deletingId === detail.id;
+  const deleteButtonRef = React.useRef<HTMLButtonElement | null>(null);
+
   function handleOpenChange(next: boolean) {
     // Closing discards an in-progress edit, so reopening the same card starts
     // in view mode rather than back in a stale form.
-    if (!next) setEditingId(null);
+    if (!next) {
+      setEditingId(null);
+      setDeletingId(null);
+    }
     onOpenChange(next);
   }
 
@@ -122,6 +136,12 @@ export function ItemDrawer({
                   // not carry, so the pencil waits for the fetch to land.
                   canEdit={Boolean(detail)}
                   onEdit={() => detail && setEditingId(detail.id)}
+                  // Delete waits for detail too: it names the item in the
+                  // confirmation, and an item whose fetch failed is not one to
+                  // offer deleting.
+                  canDelete={Boolean(detail)}
+                  onDelete={() => detail && setDeletingId(detail.id)}
+                  deleteRef={deleteButtonRef}
                 />
 
                 <div className="flex flex-col gap-5 p-4">
@@ -135,6 +155,19 @@ export function ItemDrawer({
                     detail && <ItemBody item={detail} />
                   )}
                 </div>
+
+                {detail && (
+                  <DeleteItemDialog
+                    open={isConfirmingDelete}
+                    onOpenChange={(next) =>
+                      setDeletingId(next ? detail.id : null)
+                    }
+                    itemId={detail.id}
+                    itemTitle={detail.title}
+                    onDeleted={onDeleted}
+                    returnFocusTo={deleteButtonRef}
+                  />
+                )}
               </>
             )}
           </>
@@ -147,19 +180,25 @@ export function ItemDrawer({
 /**
  * Favorite / Pin / Copy / Edit / Delete.
  *
- * Edit is live; the rest stay disabled until their own mutations land. Favorite
- * and Pin still reflect the item's current state.
+ * Edit and Delete are live; Favorite, Pin and Copy stay disabled until their own
+ * mutations land. Favorite and Pin still reflect the item's current state.
  */
 function ActionBar({
   isFavorite,
   isPinned,
   canEdit,
   onEdit,
+  canDelete,
+  onDelete,
+  deleteRef,
 }: {
   isFavorite: boolean;
   isPinned: boolean;
   canEdit: boolean;
   onEdit: () => void;
+  canDelete: boolean;
+  onDelete: () => void;
+  deleteRef: React.RefObject<HTMLButtonElement | null>;
 }) {
   return (
     <div className="flex items-center gap-1 border-b border-border px-3 py-2">
@@ -186,6 +225,10 @@ function ActionBar({
       <ActionButton
         icon={<Trash2 />}
         label="Delete"
+        onClick={onDelete}
+        disabled={!canDelete}
+        title={canDelete ? "Delete" : "Loading…"}
+        buttonRef={deleteRef}
         className="ml-auto text-destructive"
       />
     </div>
@@ -204,6 +247,7 @@ function ActionButton({
   onClick,
   disabled,
   title,
+  buttonRef,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -212,12 +256,14 @@ function ActionButton({
   onClick?: () => void;
   disabled?: boolean;
   title?: string;
+  buttonRef?: React.RefObject<HTMLButtonElement | null>;
 }) {
   const isDisabled = disabled ?? !onClick;
 
   return (
     <button
       type="button"
+      ref={buttonRef}
       onClick={onClick}
       disabled={isDisabled}
       title={title ?? `${label} — coming soon`}

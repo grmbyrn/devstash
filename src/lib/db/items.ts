@@ -330,6 +330,36 @@ export async function updateItem(
   }
 }
 
+/**
+ * Delete one item, returning whether it was there to delete.
+ *
+ * Ownership sits in the `where` clause exactly as it does for `getItemById` and
+ * `updateItem`, so another user's item is never removed and reports the same
+ * absence as an id that never existed — the caller cannot use a delete to learn
+ * which ids are real.
+ *
+ * The join rows in `TagsOnItems` and `ItemCollection` go with it via the
+ * schema's `onDelete: Cascade`. `Tag` rows left with no items are *not* cleaned
+ * up here, matching `updateItem`.
+ */
+export async function deleteItem(
+  userId: string,
+  id: string,
+): Promise<boolean> {
+  try {
+    await prisma.item.delete({
+      // `id` alone is unique; `userId` narrows it so a foreign item matches
+      // nothing and Prisma raises P2025 rather than deleting.
+      where: { id, userId },
+    });
+
+    return true;
+  } catch (error) {
+    if (isRecordNotFound(error)) return false;
+    throw error;
+  }
+}
+
 /** True for Prisma's "record not found" error, without importing its namespace. */
 function isRecordNotFound(error: unknown): boolean {
   return (

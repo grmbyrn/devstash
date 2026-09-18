@@ -1,7 +1,10 @@
 "use server";
 
 import { auth } from "@/auth";
-import { updateItem as updateItemQuery } from "@/lib/db/items";
+import {
+  deleteItem as deleteItemQuery,
+  updateItem as updateItemQuery,
+} from "@/lib/db/items";
 import type { ItemDetail } from "@/lib/db/items";
 import { updateItemSchema } from "@/lib/validations/item";
 
@@ -56,6 +59,40 @@ export async function updateItem(
   } catch (error) {
     // Log for the server, but never hand the client a database message.
     console.error("Item update error:", error);
+    return {
+      success: false,
+      error: "Something went wrong. Please try again.",
+    };
+  }
+}
+
+/**
+ * Delete an item from the drawer.
+ *
+ * The confirmation dialog in front of this is a UX gate, not the rule: the auth
+ * check and the ownership filter inside the query are what actually decide.
+ * A foreign or unknown id reports the same "Item not found." as each other.
+ */
+export async function deleteItem(itemId: string): Promise<ActionResult<null>> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "You need to be signed in to do that." };
+    }
+
+    if (typeof itemId !== "string" || itemId.length === 0) {
+      return { success: false, error: "Item not found." };
+    }
+
+    const deleted = await deleteItemQuery(session.user.id, itemId);
+    if (!deleted) {
+      return { success: false, error: "Item not found." };
+    }
+
+    return { success: true, data: null };
+  } catch (error) {
+    // Log for the server, but never hand the client a database message.
+    console.error("Item delete error:", error);
     return {
       success: false,
       error: "Something went wrong. Please try again.",
