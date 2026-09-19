@@ -16,8 +16,10 @@ import { toast } from "sonner";
 
 import { updateItem } from "@/actions/items";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Textarea } from "@/components/ui/textarea";
 import type { ItemDetail, ItemWithMeta } from "@/lib/db/items";
 import { formatFileSize, relativeTime } from "@/lib/format";
 import { editableFields } from "@/lib/item-types";
@@ -568,49 +570,6 @@ function ItemEditForm({
         </dl>
       </div>
     </form>
-  );
-}
-
-function Field({
-  label,
-  htmlFor,
-  hint,
-  children,
-}: {
-  label: string;
-  htmlFor: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label
-        htmlFor={htmlFor}
-        className="text-xs font-medium text-muted-foreground"
-      >
-        {label}
-        {hint && <span className="ml-1.5 font-normal opacity-70">({hint})</span>}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-/**
- * Textarea styled to match `Input`, which shadcn's set doesn't include here.
- */
-function Textarea({
-  className,
-  ...props
-}: React.ComponentProps<"textarea">) {
-  return (
-    <textarea
-      className={cn(
-        "flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
-        className,
-      )}
-      {...props}
-    />
   );
 }
 

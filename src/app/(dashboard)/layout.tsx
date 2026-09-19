@@ -1,7 +1,7 @@
-import { Plus, Search } from "lucide-react";
+import { Search } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NewItemButton } from "@/components/dashboard/new-item-button";
 import { ItemDrawerProvider } from "@/components/dashboard/item-drawer-provider";
 import { Sidebar, SidebarTrigger } from "@/components/dashboard/sidebar";
 import { Toaster } from "@/components/ui/sonner";
@@ -11,6 +11,7 @@ import {
   getRecentCollections,
 } from "@/lib/db/collections";
 import { getSystemItemTypes } from "@/lib/db/items";
+import { isCreatableType } from "@/lib/item-types";
 import { RECENT_COLLECTIONS_LIMIT } from "@/lib/constants";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
@@ -39,6 +40,9 @@ export default async function DashboardLayout({
     getRecentCollections(userId, RECENT_COLLECTIONS_LIMIT),
   ]);
   const recents = recentCollections.slice(0, SIDEBAR_RECENT_LIMIT);
+  // The sidebar lists every type; the create dialog only offers the ones an
+  // item can be typed into — file and image need an upload that doesn't exist yet.
+  const creatableTypes = itemTypes.filter((type) => isCreatableType(type.name));
   const user = {
     name: session.user.name,
     email: session.user.email,
@@ -61,10 +65,7 @@ export default async function DashboardLayout({
               />
             </div>
             <div className="ml-auto">
-              <Button size="sm">
-                <Plus />
-                New item
-              </Button>
+              <NewItemButton itemTypes={creatableTypes} />
             </div>
           </header>
           <main className="flex-1 p-6">

@@ -1,16 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.fn();
+const createItemQueryMock = vi.fn();
 const updateItemQueryMock = vi.fn();
 const deleteItemQueryMock = vi.fn();
+const getSystemItemTypesMock = vi.fn();
 
 vi.mock("@/auth", () => ({ auth: authMock }));
 vi.mock("@/lib/db/items", () => ({
+  createItem: createItemQueryMock,
   updateItem: updateItemQueryMock,
   deleteItem: deleteItemQueryMock,
+  getSystemItemTypes: getSystemItemTypesMock,
 }));
 
-const { deleteItem, updateItem } = await import("./items");
+const { createItem, deleteItem, updateItem } = await import("./items");
+
+/** The system types the create action resolves `itemTypeId` against. */
+const SYSTEM_TYPES = [
+  { id: "type_snippet", name: "snippet", icon: "Code", color: "#3b82f6" },
+  { id: "type_note", name: "note", icon: "StickyNote", color: "#fde047" },
+  { id: "type_link", name: "link", icon: "Link", color: "#10b981" },
+  { id: "type_file", name: "file", icon: "File", color: "#6b7280" },
+];
 
 const SESSION = { user: { id: "user_1" } };
 
@@ -177,5 +189,142 @@ describe("deleteItem action", () => {
     expect(result.success).toBe(false);
     expect(result.error).toBe("Something went wrong. Please try again.");
     expect(result.error).not.toContain("db-prod-01");
+  });
+});
+
+describe("createItem action", () => {
+  const createdItem = { ...savedItem, id: "item_new" };
+
+  beforeEach(() => {
+    authMock.mockResolvedValue(SESSION);
+    getSystemItemTypesMock.mockResolvedValue(SYSTEM_TYPES);
+    createItemQueryMock.mockResolvedValue(createdItem);
+  });
+
+  it("creates a valid item and returns its detail", async () => {
+    const result = await createItem({
+      itemTypeId: "type_snippet",
+      title: "useDebounce",
+      tags: ["react"],
+    });
+
+    expect(result).toEqual({ success: true, data: createdItem });
+  });
+
+  it("passes the session's user id to the query, not anything from the caller", async () => {
+    await createItem({
+      itemTypeId: "type_snippet",
+      title: "t",
+      userId: "user_999",
+    });
+
+    expect(createItemQueryMock).toHaveBeenCalledWith(
+      "user_1",
+      expect.objectContaining({ title: "t", itemTypeId: "type_snippet" }),
+    );
+    expect(createItemQueryMock.mock.calls[0][1]).not.toHaveProperty("userId");
+  });
+
+  it("refuses when there is no session, without touching the database", async () => {
+    authMock.mockResolvedValue(null);
+
+    const result = await createItem({
+      itemTypeId: "type_snippet",
+      title: "t",
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("You need to be signed in to do that.");
+    expect(createItemQueryMock).not.toHaveBeenCalled();
+  });
+
+  it("stops at validation before writing anything", async () => {
+    const result = await createItem({ itemTypeId: "type_snippet", title: "" });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Title is required");
+    expect(createItemQueryMock).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The type id comes from the client, so it is resolved against the real
+   * system types rather than handed to the database on trust.
+   */
+  it("refuses an item type that does not exist", async () => {
+    const result = await createItem({
+      itemTypeId: "type_made_up",
+      title: "t",
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Choose an item type.");
+    expect(createItemQueryMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses an upload-backed type, which has no file to point at", async () => {
+    const result = await createItem({ itemTypeId: "type_file", title: "t" });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Choose an item type.");
+    expect(createItemQueryMock).not.toHaveBeenCalled();
+  });
+
+  it("drops fields the chosen type does not use", async () => {
+    await createItem({
+      itemTypeId: "type_note",
+      title: "t",
+      content: "a note",
+      language: "typescript",
+      url: "https://example.com",
+    });
+
+    const data = createItemQueryMock.mock.calls[0][1];
+    expect(data).toHaveProperty("content", "a note");
+    // A note has no language and no url, whatever the payload claimed.
+    expect(data).not.toHaveProperty("language");
+    expect(data).not.toHaveProperty("url");
+  });
+
+  it("keeps the url for a link and drops its content", async () => {
+    await createItem({
+      itemTypeId: "type_link",
+      title: "t",
+      url: "https://example.com",
+      content: "should not be stored",
+    });
+
+    const data = createItemQueryMock.mock.calls[0][1];
+    expect(data).toHaveProperty("url", "https://example.com");
+    expect(data).not.toHaveProperty("content");
+  });
+
+  it("requires a url for a link", async () => {
+    const result = await createItem({ itemTypeId: "type_link", title: "t" });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("URL is required for links.");
+    expect(createItemQueryMock).not.toHaveBeenCalled();
+  });
+
+  it("does not require a url for types that have no url", async () => {
+    const result = await createItem({ itemTypeId: "type_note", title: "t" });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("never hands the client a database error message", async () => {
+    createItemQueryMock.mockRejectedValue(
+      new Error("relation \"Item\" does not exist"),
+    );
+
+    const result = await createItem({
+      itemTypeId: "type_snippet",
+      title: "t",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Something went wrong. Please try again.",
+    });
   });
 });

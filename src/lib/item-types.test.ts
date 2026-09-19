@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   editableFields,
   findTypeBySlug,
+  isCreatableType,
   typeLabel,
   typeSlug,
 } from "@/lib/item-types";
@@ -104,5 +105,26 @@ describe("editableFields", () => {
       language: false,
       url: false,
     });
+  });
+});
+
+describe("isCreatableType", () => {
+  it("allows the five types that are created by typing", () => {
+    for (const name of ["snippet", "prompt", "command", "note", "link"]) {
+      expect(isCreatableType(name)).toBe(true);
+    }
+  });
+
+  /**
+   * File and image items exist because something was uploaded — creating one
+   * from a form would write a FILE item with no file.
+   */
+  it("refuses the upload-backed types", () => {
+    expect(isCreatableType("file")).toBe(false);
+    expect(isCreatableType("image")).toBe(false);
+  });
+
+  it("allows an unknown type rather than blocking a future custom one", () => {
+    expect(isCreatableType("custom-thing")).toBe(true);
   });
 });

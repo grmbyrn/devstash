@@ -6,7 +6,9 @@ vi.mock("@/lib/prisma", async () => ({
   prisma: (await import("@/test/prisma-mock")).prismaMock,
 }));
 
-const { deleteItem, getItemById, updateItem } = await import("./items");
+const { createItem, deleteItem, getItemById, updateItem } = await import(
+  "./items",
+);
 
 /**
  * `src/lib/db` is normally out of unit-test scope (thin I/O), but `getItemById`
@@ -270,5 +272,139 @@ describe("deleteItem", () => {
     await expect(deleteItem("user_1", "item_1")).rejects.toThrow(
       "connection refused",
     );
+  });
+});
+
+/**
+ * `createItem` has no `where` clause to carry ownership — the row doesn't exist
+ * yet — so what matters is that the item is created *under* the caller's user
+ * and that the reshaped detail comes back the same way every other fetcher
+ * returns it.
+ */
+describe("createItem", () => {
+  const createdRow = {
+    id: "item_new",
+    title: "useDebounce",
+    content: "export function useDebounce() {}",
+    url: null,
+    description: "Debounce a value",
+    isFavorite: false,
+    isPinned: false,
+    language: "typescript",
+    contentType: "TEXT",
+    fileUrl: null,
+    fileName: null,
+    fileSize: null,
+    createdAt: new Date("2026-09-18T10:00:00.000Z"),
+    updatedAt: new Date("2026-09-18T10:00:00.000Z"),
+    lastUsedAt: null,
+    itemType: {
+      id: "type_snippet",
+      name: "snippet",
+      icon: "Code",
+      color: "#3b82f6",
+    },
+    tags: [{ tag: { name: "react" } }],
+    collections: [],
+  };
+
+  beforeEach(() => {
+    prismaMock.item.create.mockResolvedValue(createdRow);
+  });
+
+  it("creates the item under the given user and type", async () => {
+    await createItem("user_1", {
+      itemTypeId: "type_snippet",
+      title: "useDebounce",
+    });
+
+    const { data } = prismaMock.item.create.mock.calls[0][0];
+    expect(data.user).toEqual({ connect: { id: "user_1" } });
+    expect(data.itemType).toEqual({ connect: { id: "type_snippet" } });
+  });
+
+  it("stamps every created item as text content", async () => {
+    await createItem("user_1", { itemTypeId: "type_note", title: "t" });
+
+    const { data } = prismaMock.item.create.mock.calls[0][0];
+    expect(data.contentType).toBe("TEXT");
+  });
+
+  it("writes only the fields it was given", async () => {
+    await createItem("user_1", {
+      itemTypeId: "type_snippet",
+      title: "t",
+      content: "echo hi",
+    });
+
+    const { data } = prismaMock.item.create.mock.calls[0][0];
+    expect(data).toMatchObject({ title: "t", content: "echo hi" });
+    expect(data).not.toHaveProperty("url");
+    expect(data).not.toHaveProperty("language");
+    expect(data).not.toHaveProperty("description");
+  });
+
+  it("connects or creates each tag by name", async () => {
+    await createItem("user_1", {
+      itemTypeId: "type_snippet",
+      title: "t",
+      tags: ["react", "hooks"],
+    });
+
+    const { data } = prismaMock.item.create.mock.calls[0][0];
+    expect(data.tags.create).toEqual([
+      {
+        tag: {
+          connectOrCreate: {
+            where: { name: "react" },
+            create: { name: "react" },
+          },
+        },
+      },
+      {
+        tag: {
+          connectOrCreate: {
+            where: { name: "hooks" },
+            create: { name: "hooks" },
+          },
+        },
+      },
+    ]);
+  });
+
+  it("omits the tag write entirely when there are no tags", async () => {
+    await createItem("user_1", {
+      itemTypeId: "type_snippet",
+      title: "t",
+      tags: [],
+    });
+
+    const { data } = prismaMock.item.create.mock.calls[0][0];
+    expect(data).not.toHaveProperty("tags");
+  });
+
+  it("returns the detail shape, with dates serialized for the wire", async () => {
+    const item = await createItem("user_1", {
+      itemTypeId: "type_snippet",
+      title: "useDebounce",
+    });
+
+    expect(item).toMatchObject({
+      id: "item_new",
+      title: "useDebounce",
+      type: { id: "type_snippet", name: "snippet" },
+      tags: ["react"],
+      collections: [],
+      createdAt: "2026-09-18T10:00:00.000Z",
+      lastUsedAt: null,
+    });
+  });
+
+  it("lets a database failure surface rather than swallowing it", async () => {
+    prismaMock.item.create.mockRejectedValue(new Error("connection refused"));
+
+    await expect(
+      createItem("user_1", { itemTypeId: "type_snippet", title: "t" }),
+    ).rejects.toThrow("connection refused");
   });
 });

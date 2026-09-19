@@ -1,16 +1,50 @@
-# Current Feature
+# Current Feature: Item Create
+
+Spec: @context/features/item-create-spec.md
 
 ## Status
 
-<!-- Not Started | In Progress | Complete -->
+In Progress
 
 ## Goals
 
 <!-- Bullet points of what success looks like -->
 
+- The "New item" button in the dashboard header opens a modal dialog for creating an item (it currently does nothing).
+- A type selector covers the five text types — snippet, prompt, command, note, link.
+- Fields adapt to the selected type: title (required), description and tags for all; content + language for snippet/command; content for prompt/note; URL (required) for link.
+- New `createItem` server action in `src/actions/items.ts`, Zod-validated, session-scoped, returning the existing `{ success, data, error }` shape.
+- New `createItem` query in `src/lib/db/items.ts`, writing the item with its tags.
+- On success: toast, close the modal, refresh so the new item appears in the grid behind it.
+- Unit tests for the new schema, action and query, per @context/ai-interactions.md.
+
 ## Notes
 
 <!-- Additional context, constraints, or details from spec -->
+
+### Decisions to settle at `start`
+
+1. **No Dialog primitive exists yet.** `src/components/ui/` has `alert-dialog`, `sheet`, `button`, `input`, `badge`, `sonner` — no `dialog.tsx`. `@radix-ui/react-dialog` *is* already installed (the sidebar/drawer `Sheet` is built on it), so **no new dependency** — but the component has to be hand-written against `@radix-ui` + `cva` to match `button.tsx`/`sheet.tsx`. The shadcn CLI emits `@base-ui/react` output on this project's style, which isn't installed; that bit both `badge.tsx` and `alert-dialog.tsx` and needed the same rewrite.
+2. **Where the dialog state lives.** The "New item" button sits in `src/app/(dashboard)/layout.tsx:65` — a server component — and `ItemDrawerProvider` only wraps `{children}` inside `<main>`, so the header can't reach it. Leaning toward a self-contained client `NewItemButton` that owns its own open state, rather than hoisting another provider around the whole layout.
+3. **Which types the selector offers.** The spec lists five and omits **file** and **image** — correct: those are `ContentType.FILE` upload types, Pro-gated, and R2 isn't wired up. The layout already fetches `getSystemItemTypes()`, so pass the filtered list down as a prop instead of re-querying from the client.
+4. **Field mapping already exists.** `editableFields(typeName)` in `src/lib/item-types.ts` encodes exactly the content/language/url split the spec describes — reuse it rather than writing new per-type conditionals. Gap: it says *which* fields a type uses, not which are **required**. The spec makes URL required for links, so either extend that helper or encode it in the create schema (schema is the real rule either way).
+5. **Create schema is not `updateItemSchema`.** Update's three-state `undefined` / `null` / text semantics exist to leave untouched columns alone; create has nothing to leave alone, and additionally needs a required `itemTypeId` and the required-URL-for-link rule. Expect a sibling `createItemSchema` in `src/lib/validations/item.ts` sharing the trim/dedupe helpers (`parseTagInput`, `MAX_TAGS`).
+6. **`contentType` is required on `Item`.** The column is the `TEXT | FILE` enum; all five types here are `TEXT`. The create query must set it — the spec doesn't mention it.
+
+### Constraints carried from the codebase
+
+- Ownership comes from the session (`auth()` inside the action), never from the client payload — same as `updateItem`/`deleteItem`.
+- Tags are written via `connectOrCreate` on the global `Tag` table, matching `updateItem`. (Known open issue, still out of scope: nothing cleans up orphaned `Tag` rows.)
+- Toasts: `sonner` is already installed and its `<Toaster />` is mounted once in the `(dashboard)` layout.
+- Pages stay server components; interactivity in small client islands (see @context/coding-standards.md and the memory rule).
+- Coverage note: `vitest` `coverage.include` is deliberately scoped to `src/actions` + `src/lib`, so API routes read as untested — not relevant here unless a route gets added.
+
+### Out of scope
+
+- File/image item types and R2 upload.
+- Creating an item directly into a collection (the dialog has no collection picker in this spec).
+- Favorite / Pin / Copy in the drawer — still disabled.
+- A real code editor for the content field; it remains a textarea.
 
 ## History
 
