@@ -54,6 +54,34 @@ describe("user scoping on dashboard queries", () => {
     );
   });
 
+  it("createItem creates the row under the given user", async () => {
+    prismaMock.item.create.mockResolvedValue({
+      id: "item_new",
+      title: "t",
+      content: null,
+      url: null,
+      description: null,
+      isFavorite: false,
+      isPinned: false,
+      language: null,
+      contentType: "TEXT",
+      fileUrl: null,
+      fileName: null,
+      fileSize: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastUsedAt: null,
+      itemType: { id: "t1", name: "note", icon: "StickyNote", color: "#fde047" },
+      tags: [],
+      collections: [],
+    });
+
+    await items.createItem(USER, { itemTypeId: "t1", title: "t" });
+
+    const { data } = prismaMock.item.create.mock.calls[0][0];
+    expect(data.user).toEqual({ connect: { id: USER } });
+  });
+
   it("deleteItem scopes the delete to the user, not just the id", async () => {
     prismaMock.item.delete.mockResolvedValue({ id: "item_1" });
 

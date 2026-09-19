@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { MAX_TAGS, parseTagInput, updateItemSchema } from "@/lib/validations/item";
+import {
+  createItemSchema,
+  MAX_TAGS,
+  parseTagInput,
+  updateItemSchema,
+} from "@/lib/validations/item";
 
 describe("parseTagInput", () => {
   it("splits on commas and trims each tag", () => {
@@ -120,5 +125,101 @@ describe("updateItemSchema — tags", () => {
     const result = updateItemSchema.safeParse({ title: "t", tags: tooMany });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe("createItemSchema", () => {
+  const base = { itemTypeId: "type_snippet", title: "useDebounce" };
+
+  it("accepts a minimal payload of just a type and a title", () => {
+    const result = createItemSchema.safeParse(base);
+
+    expect(result.success).toBe(true);
+    expect(result.data?.itemTypeId).toBe("type_snippet");
+    expect(result.data?.title).toBe("useDebounce");
+  });
+
+  it("requires an item type", () => {
+    const result = createItemSchema.safeParse({ title: "t" });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toBe("Choose an item type");
+  });
+
+  it("requires a non-blank title", () => {
+    const result = createItemSchema.safeParse({ ...base, title: "   " });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toBe("Title is required");
+  });
+
+  it("trims the title and the text fields", () => {
+    const result = createItemSchema.parse({
+      ...base,
+      title: "  Spaced  ",
+      description: "  a note  ",
+    });
+
+    expect(result.title).toBe("Spaced");
+    expect(result.description).toBe("a note");
+  });
+
+  /**
+   * On create there is no existing row to leave alone, so both an absent field
+   * and a blank one mean the same thing: nothing to write.
+   */
+  it("treats a blank optional field as unset", () => {
+    const result = createItemSchema.parse({ ...base, description: "   " });
+
+    expect(result.description).toBeNull();
+  });
+
+  it("rejects a url that is not a url", () => {
+    const result = createItemSchema.safeParse({ ...base, url: "not a url" });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toBe("Enter a valid URL");
+  });
+
+  it("accepts a valid url", () => {
+    const result = createItemSchema.parse({
+      ...base,
+      url: "https://example.com/docs",
+    });
+
+    expect(result.url).toBe("https://example.com/docs");
+  });
+
+  /**
+   * Requiring a url for links needs the type row, so it lives in the action —
+   * the schema itself must let a missing url through.
+   */
+  it("does not require a url, since that rule depends on the type", () => {
+    expect(createItemSchema.safeParse(base).success).toBe(true);
+  });
+
+  it("shares the tag rules with updateItemSchema", () => {
+    const result = createItemSchema.parse({
+      ...base,
+      tags: ["React", "react", "hooks"],
+    });
+
+    expect(result.tags).toEqual(["React", "hooks"]);
+
+    const tooMany = Array.from({ length: MAX_TAGS + 1 }, (_, i) => `tag${i}`);
+    expect(
+      createItemSchema.safeParse({ ...base, tags: tooMany }).success,
+    ).toBe(false);
+  });
+
+  it("strips keys it does not know about", () => {
+    const result = createItemSchema.parse({
+      ...base,
+      userId: "user_999",
+      isPinned: true,
+    });
+
+    expect(result).not.toHaveProperty("userId");
+    expect(result).not.toHaveProperty("isPinned");
   });
 });

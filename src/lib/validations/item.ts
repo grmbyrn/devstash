@@ -34,34 +34,74 @@ const nullableUrl = nullableText.refine(
   { message: "Enter a valid URL" },
 );
 
+/** A capped, deduplicated list of tag names. Shared by create and update. */
+const tagList = z
+  .array(z.string().trim().min(1, "Tags cannot be empty"))
+  .max(MAX_TAGS, `Use at most ${MAX_TAGS} tags`)
+  // Tag rows are unique by name, so a duplicate in one payload would collide
+  // on insert. Dedupe case-insensitively, keeping the first spelling.
+  .transform((tags) => {
+    const seen = new Set<string>();
+    return tags.filter((tag) => {
+      const key = tag.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  })
+  .optional();
+
+/** The title rule, identical on create and update. */
+const itemTitle = z
+  .string()
+  .trim()
+  .min(1, "Title is required")
+  .max(200, "Title is too long");
+
 /**
  * Payload for `updateItem`. Every field except `title` is optional so a partial
  * save touches only what it sends.
  */
 export const updateItemSchema = z.object({
-  title: z.string().trim().min(1, "Title is required").max(200, "Title is too long"),
+  title: itemTitle,
   description: nullableText,
   content: nullableText,
   language: nullableText,
   url: nullableUrl,
-  tags: z
-    .array(z.string().trim().min(1, "Tags cannot be empty"))
-    .max(MAX_TAGS, `Use at most ${MAX_TAGS} tags`)
-    // Tag rows are unique by name, so a duplicate in one payload would collide
-    // on insert. Dedupe case-insensitively, keeping the first spelling.
-    .transform((tags) => {
-      const seen = new Set<string>();
-      return tags.filter((tag) => {
-        const key = tag.toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-    })
-    .optional(),
+  tags: tagList,
 });
 
 export type UpdateItemInput = z.infer<typeof updateItemSchema>;
+
+/**
+ * Payload for `createItem`.
+ *
+ * Shaped like the update payload with `itemTypeId` added, but the optional
+ * fields mean something simpler here: there is no existing row to leave alone,
+ * so an absent field and a cleared one both end up unset.
+ *
+ * Note what this deliberately does *not* check: whether `itemTypeId` names a
+ * real type, and whether the fields sent make sense for it. Both need the type
+ * row, so they live in the action — which resolves the id against the actual
+ * system types rather than trusting the client's word for it.
+ */
+export const createItemSchema = z.object({
+  // The custom message covers a missing id as well as a blank one — both mean
+  // the same thing to the user, and Zod's default ("expected string, received
+  // undefined") would otherwise reach a toast.
+  itemTypeId: z
+    .string({ error: "Choose an item type" })
+    .trim()
+    .min(1, "Choose an item type"),
+  title: itemTitle,
+  description: nullableText,
+  content: nullableText,
+  language: nullableText,
+  url: nullableUrl,
+  tags: tagList,
+});
+
+export type CreateItemInput = z.infer<typeof createItemSchema>;
 
 /**
  * Split the drawer's comma-separated tag field into the array the schema

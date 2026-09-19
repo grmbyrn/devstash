@@ -53,3 +53,17 @@ export function editableFields(typeName: string): EditableFields {
     url: TYPES_WITH_URL.has(typeName),
   };
 }
+
+/**
+ * Whether an item of this type can be created by typing into a form.
+ *
+ * File and image items are `ContentType.FILE`: they exist because something was
+ * uploaded, and their body is an R2 URL rather than text. Uploads aren't wired
+ * up, so the create dialog offers the five text types only — and the server
+ * checks this too, so a hand-made payload can't create an empty file item.
+ */
+const FILE_UPLOAD_TYPES = new Set(["file", "image"]);
+
+export function isCreatableType(typeName: string): boolean {
+  return !FILE_UPLOAD_TYPES.has(typeName);
+}

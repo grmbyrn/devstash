@@ -258,6 +258,66 @@ export async function getItemById(
   return toItemDetail(row);
 }
 
+/** The columns `createItem` writes. `itemTypeId` is required; the rest are not. */
+export interface CreateItemData {
+  itemTypeId: string;
+  title: string;
+  description?: string | null;
+  content?: string | null;
+  language?: string | null;
+  url?: string | null;
+  tags?: string[];
+}
+
+/**
+ * Create one item for a user and return its full detail.
+ *
+ * Ownership isn't a filter here the way it is on read and update — there is no
+ * existing row to match — so `userId` is simply what the item is created under,
+ * and it comes from the session, never from the payload.
+ *
+ * Tags are written the same way `updateItem` replaces them: `connectOrCreate`
+ * against the global `Tag` table, so one name is always one row.
+ */
+export async function createItem(
+  userId: string,
+  data: CreateItemData,
+): Promise<ItemDetail> {
+  const { tags, itemTypeId, ...fields } = data;
+
+  // Undefined keys are dropped rather than written as null, so the columns a
+  // type doesn't use keep their schema defaults.
+  const scalars = Object.fromEntries(
+    Object.entries(fields).filter(([, value]) => value !== undefined),
+  );
+
+  const row = await prisma.item.create({
+    data: {
+      ...scalars,
+      title: data.title,
+      // Every creatable type is a text type. FILE is reserved for the file and
+      // image types, which are created by uploading and aren't wired up yet.
+      contentType: "TEXT",
+      user: { connect: { id: userId } },
+      itemType: { connect: { id: itemTypeId } },
+      ...(tags && tags.length > 0
+        ? {
+            tags: {
+              create: tags.map((name) => ({
+                tag: {
+                  connectOrCreate: { where: { name }, create: { name } },
+                },
+              })),
+            },
+          }
+        : {}),
+    },
+    select: itemDetailSelect,
+  });
+
+  return toItemDetail(row);
+}
+
 /** The columns `updateItem` may write. Absent keys are left untouched. */
 export interface UpdateItemData {
   title: string;
