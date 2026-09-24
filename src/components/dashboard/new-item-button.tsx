@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { createItem } from "@/actions/items";
 import { Button } from "@/components/ui/button";
+import { CodeEditor } from "@/components/ui/code-editor";
 import {
   Dialog,
   DialogContent,
@@ -212,17 +213,32 @@ function NewItemForm({
         </Field>
       )}
 
-      {fields.content && (
-        <Field label="Content" htmlFor="new-item-content">
-          <Textarea
-            id="new-item-content"
-            rows={8}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            className="font-mono text-xs"
-          />
-        </Field>
-      )}
+      {fields.content &&
+        (fields.language ? (
+          // Snippets and commands get the real editor; notes and prompts keep
+          // the textarea. No `htmlFor`: Monaco owns its textarea, so the editor
+          // carries its own accessible name instead of being a label target.
+          <Field label="Content">
+            <CodeEditor
+              value={content}
+              onChange={setContent}
+              // The live value, so retyping the Language field above
+              // re-highlights immediately.
+              language={language}
+              ariaLabel="Content"
+            />
+          </Field>
+        ) : (
+          <Field label="Content" htmlFor="new-item-content">
+            <Textarea
+              id="new-item-content"
+              rows={8}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className="font-mono text-xs"
+            />
+          </Field>
+        ))}
 
       <Field label="Tags" htmlFor="new-item-tags" hint="Separate with commas">
         <Input

@@ -16,6 +16,7 @@ import { toast } from "sonner";
 
 import { updateItem } from "@/actions/items";
 import { Button } from "@/components/ui/button";
+import { CodeEditor } from "@/components/ui/code-editor";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -284,6 +285,11 @@ function ActionButton({
 }
 
 function ItemBody({ item }: { item: ItemDetail }) {
+  // Snippets and commands render in the real editor; every other type keeps the
+  // plain block. `editableFields(...).language` is already exactly that pair —
+  // keying off it rather than a second list means the two can't drift.
+  const isCode = editableFields(item.type.name).language;
+
   return (
     <>
       {item.description && (
@@ -302,11 +308,18 @@ function ItemBody({ item }: { item: ItemDetail }) {
         </a>
       )}
 
-      {item.content && (
-        <pre className="overflow-x-auto whitespace-pre-wrap wrap-break-word rounded-md bg-muted/50 p-3 font-mono text-xs leading-relaxed text-foreground">
-          {item.content}
-        </pre>
-      )}
+      {item.content &&
+        (isCode ? (
+          <CodeEditor
+            value={item.content}
+            language={item.language}
+            ariaLabel={`${item.title} — code`}
+          />
+        ) : (
+          <pre className="overflow-x-auto whitespace-pre-wrap wrap-break-word rounded-md bg-muted/50 p-3 font-mono text-xs leading-relaxed text-foreground">
+            {item.content}
+          </pre>
+        ))}
 
       {item.fileUrl && (
         <a
@@ -532,17 +545,31 @@ function ItemEditForm({
           </Field>
         )}
 
-        {fields.content && (
-          <Field label="Content" htmlFor="item-content">
-            <Textarea
-              id="item-content"
-              rows={10}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="font-mono text-xs"
-            />
-          </Field>
-        )}
+        {fields.content &&
+          (fields.language ? (
+            // No `htmlFor`: Monaco owns its textarea, so the editor carries its
+            // own accessible name instead of being a label target.
+            <Field label="Content">
+              <CodeEditor
+                value={content}
+                onChange={setContent}
+                // The live value, so retyping the Language field above
+                // re-highlights immediately rather than on save.
+                language={language}
+                ariaLabel="Content"
+              />
+            </Field>
+          ) : (
+            <Field label="Content" htmlFor="item-content">
+              <Textarea
+                id="item-content"
+                rows={10}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                className="font-mono text-xs"
+              />
+            </Field>
+          ))}
 
         <Field label="Tags" htmlFor="item-tags" hint="Separate with commas">
           <Input
