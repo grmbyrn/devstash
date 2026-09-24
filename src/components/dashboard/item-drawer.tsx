@@ -17,13 +17,14 @@ import { toast } from "sonner";
 import { updateItem } from "@/actions/items";
 import { Button } from "@/components/ui/button";
 import { CodeEditor } from "@/components/ui/code-editor";
+import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import type { ItemDetail, ItemWithMeta } from "@/lib/db/items";
 import { formatFileSize, relativeTime } from "@/lib/format";
-import { editableFields } from "@/lib/item-types";
+import { editableFields, usesMarkdown } from "@/lib/item-types";
 import { parseTagInput } from "@/lib/validations/item";
 import { cn } from "@/lib/utils";
 
@@ -289,6 +290,8 @@ function ItemBody({ item }: { item: ItemDetail }) {
   // plain block. `editableFields(...).language` is already exactly that pair —
   // keying off it rather than a second list means the two can't drift.
   const isCode = editableFields(item.type.name).language;
+  // Notes and prompts are prose, so they render through the Markdown preview.
+  const isMarkdown = usesMarkdown(item.type.name);
 
   return (
     <>
@@ -315,6 +318,10 @@ function ItemBody({ item }: { item: ItemDetail }) {
             language={item.language}
             ariaLabel={`${item.title} — code`}
           />
+        ) : isMarkdown ? (
+          // No `onChange`, so the editor renders read-only: the preview alone,
+          // with no Write tab to switch to.
+          <MarkdownEditor value={item.content} />
         ) : (
           <pre className="overflow-x-auto whitespace-pre-wrap wrap-break-word rounded-md bg-muted/50 p-3 font-mono text-xs leading-relaxed text-foreground">
             {item.content}
@@ -545,11 +552,12 @@ function ItemEditForm({
           </Field>
         )}
 
-        {fields.content &&
-          (fields.language ? (
-            // No `htmlFor`: Monaco owns its textarea, so the editor carries its
-            // own accessible name instead of being a label target.
-            <Field label="Content">
+        {fields.content && (
+          // No `htmlFor`: both editors own their own input surface, so they
+          // carry their accessible name via `ariaLabel` instead of being a
+          // label target.
+          <Field label="Content">
+            {fields.language ? (
               <CodeEditor
                 value={content}
                 onChange={setContent}
@@ -558,18 +566,26 @@ function ItemEditForm({
                 language={language}
                 ariaLabel="Content"
               />
-            </Field>
-          ) : (
-            <Field label="Content" htmlFor="item-content">
+            ) : usesMarkdown(item.type.name) ? (
+              <MarkdownEditor
+                value={content}
+                onChange={setContent}
+                ariaLabel="Content"
+              />
+            ) : (
+              // Nothing reaches this today, but a future content type that is
+              // neither code nor prose gets a plain box rather than the wrong
+              // editor.
               <Textarea
-                id="item-content"
                 rows={10}
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
+                aria-label="Content"
                 className="font-mono text-xs"
               />
-            </Field>
-          ))}
+            )}
+          </Field>
+        )}
 
         <Field label="Tags" htmlFor="item-tags" hint="Separate with commas">
           <Input
