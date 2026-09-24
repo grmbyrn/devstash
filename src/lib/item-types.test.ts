@@ -6,7 +6,19 @@ import {
   isCreatableType,
   typeLabel,
   typeSlug,
+  usesMarkdown,
 } from "@/lib/item-types";
+
+/** The seeded system types, in the order `prisma/seed.ts` creates them. */
+const SYSTEM_TYPE_NAMES = [
+  "snippet",
+  "prompt",
+  "command",
+  "note",
+  "link",
+  "file",
+  "image",
+];
 
 describe("typeSlug", () => {
   it("pluralizes the stored singular name", () => {
@@ -126,5 +138,42 @@ describe("isCreatableType", () => {
 
   it("allows an unknown type rather than blocking a future custom one", () => {
     expect(isCreatableType("custom-thing")).toBe(true);
+  });
+});
+
+describe("usesMarkdown", () => {
+  it("covers the prose types", () => {
+    expect(usesMarkdown("note")).toBe(true);
+    expect(usesMarkdown("prompt")).toBe(true);
+  });
+
+  it("leaves the code types to the code editor", () => {
+    expect(usesMarkdown("snippet")).toBe(false);
+    expect(usesMarkdown("command")).toBe(false);
+  });
+
+  it("is false for types with no content body at all", () => {
+    for (const name of ["link", "file", "image"]) {
+      expect(usesMarkdown(name)).toBe(false);
+    }
+  });
+
+  it("degrades safely for an unknown type rather than guessing", () => {
+    expect(usesMarkdown("custom-thing")).toBe(false);
+  });
+
+  /**
+   * `usesMarkdown` duplicates something `editableFields` already implies: among
+   * the types that have content, the ones without a language are exactly the
+   * prose ones. The lists are kept separate because they encode different
+   * decisions, so this pins them to the same answer — if someone adds a content
+   * type to one set and forgets the other, the editor a type gets would
+   * silently change, and this fails instead.
+   */
+  it("agrees with editableFields across every system type", () => {
+    for (const name of SYSTEM_TYPE_NAMES) {
+      const fields = editableFields(name);
+      expect(usesMarkdown(name)).toBe(fields.content && !fields.language);
+    }
   });
 });

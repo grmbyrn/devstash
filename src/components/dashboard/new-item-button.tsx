@@ -19,9 +19,10 @@ import {
 } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { Textarea } from "@/components/ui/textarea";
 import type { ItemTypeSummary } from "@/lib/db/items";
-import { editableFields } from "@/lib/item-types";
+import { editableFields, usesMarkdown } from "@/lib/item-types";
 import { parseTagInput } from "@/lib/validations/item";
 import { cn } from "@/lib/utils";
 
@@ -213,12 +214,13 @@ function NewItemForm({
         </Field>
       )}
 
-      {fields.content &&
-        (fields.language ? (
-          // Snippets and commands get the real editor; notes and prompts keep
-          // the textarea. No `htmlFor`: Monaco owns its textarea, so the editor
-          // carries its own accessible name instead of being a label target.
-          <Field label="Content">
+      {fields.content && (
+        // No `htmlFor` on either: both editors own their own input surface, so
+        // they carry their accessible name via `ariaLabel` rather than being a
+        // label target.
+        <Field label="Content">
+          {fields.language ? (
+            // Snippets and commands get the code editor.
             <CodeEditor
               value={content}
               onChange={setContent}
@@ -227,18 +229,26 @@ function NewItemForm({
               language={language}
               ariaLabel="Content"
             />
-          </Field>
-        ) : (
-          <Field label="Content" htmlFor="new-item-content">
+          ) : usesMarkdown(selectedType.name) ? (
+            <MarkdownEditor
+              value={content}
+              onChange={setContent}
+              ariaLabel="Content"
+            />
+          ) : (
+            // Nothing reaches this today, but a future content type that is
+            // neither code nor prose gets a plain box rather than the wrong
+            // editor.
             <Textarea
-              id="new-item-content"
               rows={8}
               value={content}
               onChange={(e) => setContent(e.target.value)}
+              aria-label="Content"
               className="font-mono text-xs"
             />
-          </Field>
-        ))}
+          )}
+        </Field>
+      )}
 
       <Field label="Tags" htmlFor="new-item-tags" hint="Separate with commas">
         <Input

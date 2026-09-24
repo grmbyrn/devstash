@@ -67,3 +67,20 @@ const FILE_UPLOAD_TYPES = new Set(["file", "image"]);
 export function isCreatableType(typeName: string): boolean {
   return !FILE_UPLOAD_TYPES.has(typeName);
 }
+
+/**
+ * Whether a type's content is prose that should be written and previewed as
+ * Markdown, rather than code.
+ *
+ * This is the complement of `TYPES_WITH_LANGUAGE` within the types that have
+ * content at all — notes and prompts — so it could be derived rather than
+ * listed. It is spelled out instead because "prose gets Markdown" is its own
+ * decision, not a side effect of "code gets a language"; a future type could
+ * easily want one without the other. A test pins the two lists to the same
+ * answer for every system type, so the redundancy cannot rot silently.
+ */
+const TYPES_WITH_MARKDOWN = new Set(["prompt", "note"]);
+
+export function usesMarkdown(typeName: string): boolean {
+  return TYPES_WITH_MARKDOWN.has(typeName);
+}

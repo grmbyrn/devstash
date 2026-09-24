@@ -82,3 +82,183 @@
     @apply bg-background text-foreground;
   }
 }
+
+/*
+ * Rendered markdown (the Preview tab of `MarkdownEditor`).
+ *
+ * Written as plain CSS rather than Tailwind utilities because react-markdown
+ * emits the elements itself — there is nowhere to hang a class. Everything
+ * keys off the theme tokens, so the preview follows dark and light mode for
+ * free instead of hardcoding a palette that only works in one of them.
+ */
+.markdown-preview {
+  padding: 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  color: var(--foreground);
+  overflow-wrap: break-word;
+}
+
+.markdown-preview > :first-child {
+  margin-top: 0;
+}
+.markdown-preview > :last-child {
+  margin-bottom: 0;
+}
+
+/* Headings: sized and weighted so the hierarchy is readable at a glance, with
+   a rule under h1/h2 the way GitHub renders them. */
+.markdown-preview h1,
+.markdown-preview h2,
+.markdown-preview h3,
+.markdown-preview h4,
+.markdown-preview h5,
+.markdown-preview h6 {
+  margin: 1.25em 0 0.5em;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--foreground);
+}
+.markdown-preview h1 {
+  font-size: 1.5rem;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border);
+}
+.markdown-preview h2 {
+  font-size: 1.25rem;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border);
+}
+.markdown-preview h3 {
+  font-size: 1.0625rem;
+}
+.markdown-preview h4 {
+  font-size: 0.9375rem;
+}
+.markdown-preview h5 {
+  font-size: 0.875rem;
+}
+.markdown-preview h6 {
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+
+.markdown-preview p {
+  margin: 0 0 0.85em;
+}
+
+.markdown-preview strong {
+  font-weight: 600;
+}
+.markdown-preview em {
+  font-style: italic;
+}
+.markdown-preview del {
+  text-decoration: line-through;
+  color: var(--muted-foreground);
+}
+
+/* Links: blue with an underline only on hover, matching the drawer's own
+   external-link treatment. */
+.markdown-preview a {
+  color: oklch(0.7 0.14 250);
+  text-decoration: none;
+}
+.markdown-preview a:hover {
+  text-decoration: underline;
+}
+
+/* Inline code sits on a subtle wash; fenced blocks get the full dark panel. */
+.markdown-preview code {
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo,
+    monospace;
+  font-size: 0.85em;
+  background: color-mix(in oklab, var(--muted) 60%, transparent);
+  padding: 0.15em 0.35em;
+  border-radius: var(--radius-sm);
+}
+.markdown-preview pre {
+  margin: 0 0 0.85em;
+  padding: 0.75rem;
+  overflow-x: auto;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.markdown-preview pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+/* Lists: keep the markers, since `@layer base` resets them app-wide. */
+.markdown-preview ul,
+.markdown-preview ol {
+  margin: 0 0 0.85em;
+  padding-left: 1.5rem;
+}
+.markdown-preview ul {
+  list-style: disc;
+}
+.markdown-preview ul ul {
+  list-style: circle;
+}
+.markdown-preview ol {
+  list-style: decimal;
+}
+.markdown-preview li {
+  margin: 0.2em 0;
+}
+.markdown-preview li > ul,
+.markdown-preview li > ol {
+  margin: 0.2em 0;
+}
+/* GFM task lists render a checkbox as the marker, so the bullet would be a
+   second one. */
+.markdown-preview li:has(> input[type="checkbox"]) {
+  list-style: none;
+  margin-left: -1.15rem;
+}
+.markdown-preview input[type="checkbox"] {
+  margin-right: 0.4em;
+  vertical-align: middle;
+  accent-color: var(--primary);
+}
+
+.markdown-preview blockquote {
+  margin: 0 0 0.85em;
+  padding: 0.1em 0 0.1em 0.85em;
+  border-left: 3px solid var(--border);
+  color: var(--muted-foreground);
+}
+
+.markdown-preview hr {
+  margin: 1.25em 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.markdown-preview table {
+  margin: 0 0 0.85em;
+  width: auto;
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+}
+.markdown-preview th,
+.markdown-preview td {
+  padding: 0.4em 0.7em;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+.markdown-preview th {
+  background: color-mix(in oklab, var(--muted) 60%, transparent);
+  font-weight: 600;
+}
+
+.markdown-preview img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+}
