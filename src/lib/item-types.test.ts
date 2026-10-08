@@ -6,6 +6,7 @@ import {
   isCreatableType,
   typeLabel,
   typeSlug,
+  rendersAsMarkdown,
   usesMarkdown,
 } from "@/lib/item-types";
 
@@ -175,5 +176,70 @@ describe("usesMarkdown", () => {
       const fields = editableFields(name);
       expect(usesMarkdown(name)).toBe(fields.content && !fields.language);
     }
+  });
+});
+
+
+describe("rendersAsMarkdown", () => {
+  it("is always true for the prose types, whatever the language says", () => {
+    for (const lang of [null, undefined, "typescript", "markdown"]) {
+      expect(rendersAsMarkdown("note", lang)).toBe(true);
+      expect(rendersAsMarkdown("prompt", lang)).toBe(true);
+    }
+  });
+
+  /**
+   * The case this was built for: a README or runbook filed as a snippet. The
+   * author marks it `markdown` and it renders as a document, not as code.
+   */
+  it("opts a snippet or command in when its language is markdown", () => {
+    expect(rendersAsMarkdown("snippet", "markdown")).toBe(true);
+    expect(rendersAsMarkdown("command", "markdown")).toBe(true);
+  });
+
+  it("accepts the aliases and casing a user might actually type", () => {
+    for (const lang of ["md", "mdx", "Markdown", "  MD  ", ".md"]) {
+      expect(rendersAsMarkdown("snippet", lang)).toBe(true);
+    }
+  });
+
+  /**
+   * The regression that matters. A Dockerfile and a shell script are full of
+   * lines starting with `#`; a content heuristic reads those as headings. The
+   * language check must leave them on Monaco.
+   */
+  it("leaves real code on the code editor", () => {
+    for (const lang of [
+      "dockerfile",
+      "terminal",
+      "bash",
+      "sh",
+      "typescript",
+      "python",
+      "sql",
+      "css",
+    ]) {
+      expect(rendersAsMarkdown("snippet", lang)).toBe(false);
+    }
+  });
+
+  it("treats a snippet with no language as code, not markdown", () => {
+    expect(rendersAsMarkdown("snippet", null)).toBe(false);
+    expect(rendersAsMarkdown("command", undefined)).toBe(false);
+    expect(rendersAsMarkdown("snippet", "")).toBe(false);
+  });
+
+  /**
+   * Types with no language field can't opt in this way, so a stray `markdown`
+   * on a link row cannot turn its (nonexistent) body into a document.
+   */
+  it("ignores the language on types that have no language field", () => {
+    for (const name of ["link", "file", "image"]) {
+      expect(rendersAsMarkdown(name, "markdown")).toBe(false);
+    }
+  });
+
+  it("degrades safely for an unknown type", () => {
+    expect(rendersAsMarkdown("custom-thing", "markdown")).toBe(false);
   });
 });

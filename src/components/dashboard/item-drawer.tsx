@@ -24,7 +24,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import type { ItemDetail, ItemWithMeta } from "@/lib/db/items";
 import { formatFileSize, relativeTime } from "@/lib/format";
-import { editableFields, usesMarkdown } from "@/lib/item-types";
+import { editableFields, rendersAsMarkdown } from "@/lib/item-types";
 import { parseTagInput } from "@/lib/validations/item";
 import { cn } from "@/lib/utils";
 
@@ -286,12 +286,11 @@ function ActionButton({
 }
 
 function ItemBody({ item }: { item: ItemDetail }) {
-  // Snippets and commands render in the real editor; every other type keeps the
-  // plain block. `editableFields(...).language` is already exactly that pair —
-  // keying off it rather than a second list means the two can't drift.
-  const isCode = editableFields(item.type.name).language;
-  // Notes and prompts are prose, so they render through the Markdown preview.
-  const isMarkdown = usesMarkdown(item.type.name);
+  // Markdown wins over code: a snippet whose language is `markdown` is a
+  // document filed as a snippet, so it renders as one. Everything else with a
+  // language field goes to Monaco, and the rest keeps the plain block.
+  const isMarkdown = rendersAsMarkdown(item.type.name, item.language);
+  const isCode = !isMarkdown && editableFields(item.type.name).language;
 
   return (
     <>
@@ -557,19 +556,22 @@ function ItemEditForm({
           // carry their accessible name via `ariaLabel` instead of being a
           // label target.
           <Field label="Content">
-            {fields.language ? (
+            {rendersAsMarkdown(item.type.name, language) ? (
+              // Driven by the live Language value, so typing `markdown` into
+              // the field above swaps the editor immediately rather than on
+              // save — and typing a real language swaps it back.
+              <MarkdownEditor
+                value={content}
+                onChange={setContent}
+                ariaLabel="Content"
+              />
+            ) : fields.language ? (
               <CodeEditor
                 value={content}
                 onChange={setContent}
                 // The live value, so retyping the Language field above
                 // re-highlights immediately rather than on save.
                 language={language}
-                ariaLabel="Content"
-              />
-            ) : usesMarkdown(item.type.name) ? (
-              <MarkdownEditor
-                value={content}
-                onChange={setContent}
                 ariaLabel="Content"
               />
             ) : (

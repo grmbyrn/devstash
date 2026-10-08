@@ -1,3 +1,5 @@
+import { normalizeLanguage } from "@/lib/code-language";
+
 /**
  * Item types are stored singular (`"snippet"`) but routed and labelled plural
  * (`/items/snippets`, "Snippets"). These helpers keep that mapping in one place
@@ -83,4 +85,29 @@ const TYPES_WITH_MARKDOWN = new Set(["prompt", "note"]);
 
 export function usesMarkdown(typeName: string): boolean {
   return TYPES_WITH_MARKDOWN.has(typeName);
+}
+
+/**
+ * Whether an item's content should be rendered and edited as Markdown.
+ *
+ * Two routes in, because the type alone is not enough:
+ *
+ *  - Notes and prompts are prose by definition, so they always are.
+ *  - A snippet or command whose `language` says `markdown` (or `md`/`mdx`) is a
+ *    Markdown *document* that happens to be filed as a snippet — a README, a
+ *    runbook, a set of notes with fenced examples. Those render as Markdown too.
+ *
+ * Keying the second route off `language` rather than sniffing the content is
+ * what keeps code safe: a Dockerfile or a shell script is full of lines
+ * starting with `#`, which a content heuristic reads as headings and a language
+ * check does not. The field already carries the answer, and the author sets it.
+ */
+export function rendersAsMarkdown(
+  typeName: string,
+  language?: string | null,
+): boolean {
+  if (usesMarkdown(typeName)) return true;
+  // Only types that actually have a language field can opt in this way.
+  if (!editableFields(typeName).language) return false;
+  return normalizeLanguage(language) === "markdown";
 }

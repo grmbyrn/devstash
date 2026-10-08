@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { Textarea } from "@/components/ui/textarea";
 import type { ItemTypeSummary } from "@/lib/db/items";
-import { editableFields, usesMarkdown } from "@/lib/item-types";
+import { editableFields, rendersAsMarkdown } from "@/lib/item-types";
 import { parseTagInput } from "@/lib/validations/item";
 import { cn } from "@/lib/utils";
 
@@ -219,7 +219,16 @@ function NewItemForm({
         // they carry their accessible name via `ariaLabel` rather than being a
         // label target.
         <Field label="Content">
-          {fields.language ? (
+          {rendersAsMarkdown(selectedType.name, language) ? (
+            // Driven by the live Language value, so typing `markdown` into the
+            // field above swaps the editor immediately — which is how a README
+            // or runbook gets filed as a snippet and still written as Markdown.
+            <MarkdownEditor
+              value={content}
+              onChange={setContent}
+              ariaLabel="Content"
+            />
+          ) : fields.language ? (
             // Snippets and commands get the code editor.
             <CodeEditor
               value={content}
@@ -227,12 +236,6 @@ function NewItemForm({
               // The live value, so retyping the Language field above
               // re-highlights immediately.
               language={language}
-              ariaLabel="Content"
-            />
-          ) : usesMarkdown(selectedType.name) ? (
-            <MarkdownEditor
-              value={content}
-              onChange={setContent}
               ariaLabel="Content"
             />
           ) : (
