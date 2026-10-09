@@ -29,6 +29,46 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* Homepage motion. Registered as theme animations so they're available as
+   `animate-arrow-pulse` / `animate-reveal` and can be gated with `motion-safe:`. */
+@theme {
+  /* Accent for homepage highlights — the prompt type's purple. */
+  --color-brand: #8b5cf6;
+
+  --animate-arrow-pulse: arrow-pulse 2s ease-in-out infinite;
+  /* `backwards` holds the first frame through any delay, then releases, so a
+     card's own hover transform still applies once the reveal has played. */
+  --animate-reveal: reveal 0.7s ease backwards;
+
+  @keyframes arrow-pulse {
+    0%,
+    100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgb(139 92 246 / 0.55);
+    }
+    50% {
+      transform: scale(1.1);
+      box-shadow: 0 0 0 14px rgb(139 92 246 / 0);
+    }
+  }
+
+  @keyframes reveal {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+/* The DevStash brand gradient: snippet blue → prompt purple → image pink. */
+@utility bg-brand-gradient {
+  background-image: linear-gradient(100deg, #3b82f6, #8b5cf6 50%, #ec4899);
+}
+
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -261,4 +301,27 @@
   max-width: 100%;
   height: auto;
   border-radius: var(--radius-md);
+}
+
+/*
+ * Homepage scroll effects.
+ *
+ * Content that fades in on scroll starts hidden only when scripting is on and
+ * motion is welcome, so it is never stuck invisible without JavaScript and is
+ * simply shown under reduced motion. Hiding in CSS (rather than after
+ * hydration) avoids a visible → hidden → visible flash on first paint.
+ */
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  [data-reveal]:not([data-visible]),
+  [data-ai-tag]:not([data-shown]) {
+    opacity: 0;
+  }
+}
+
+/* Smooth in-page anchor scrolling, scoped to the homepage so it never affects
+   the app's own route transitions. */
+@media (prefers-reduced-motion: no-preference) {
+  html:has([data-page="home"]) {
+    scroll-behavior: smooth;
+  }
 }

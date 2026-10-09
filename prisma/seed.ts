@@ -6,20 +6,11 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 import { PrismaClient } from "../src/generated/prisma/client";
 import { DEMO_USER_EMAIL } from "../src/lib/constants";
-
-const SYSTEM_TYPES = [
-  { name: "snippet", icon: "Code", color: "#3b82f6" },
-  { name: "prompt", icon: "Sparkles", color: "#8b5cf6" },
-  { name: "command", icon: "Terminal", color: "#f97316" },
-  { name: "note", icon: "StickyNote", color: "#fde047" },
-  { name: "file", icon: "File", color: "#6b7280" },
-  { name: "image", icon: "Image", color: "#ec4899" },
-  { name: "link", icon: "Link", color: "#10b981" },
-] as const;
+import { SYSTEM_TYPES, type SystemTypeName } from "../src/lib/system-types";
 
 type SeedItem = {
   title: string;
-  type: (typeof SYSTEM_TYPES)[number]["name"];
+  type: SystemTypeName;
   description?: string;
   content?: string;
   url?: string;
