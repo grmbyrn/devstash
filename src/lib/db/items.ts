@@ -22,6 +22,9 @@ export interface ItemWithMeta {
   isFavorite: boolean;
   isPinned: boolean;
   language: string | null;
+  /** The R2 object *key* for uploads (never a URL — the bucket is private). */
+  fileUrl: string | null;
+  fileName: string | null;
   type: ItemTypeSummary;
   /** Tag names, ordered as returned by the database. */
   tags: string[];
@@ -38,6 +41,8 @@ const itemCardSelect = {
   isFavorite: true,
   isPinned: true,
   language: true,
+  fileUrl: true,
+  fileName: true,
   itemType: { select: { id: true, name: true, icon: true, color: true } },
   tags: { select: { tag: { select: { name: true } } } },
 } as const;
@@ -51,6 +56,8 @@ type ItemCardRow = {
   isFavorite: boolean;
   isPinned: boolean;
   language: string | null;
+  fileUrl: string | null;
+  fileName: string | null;
   itemType: ItemTypeSummary;
   tags: { tag: { name: string } }[];
 };
@@ -65,6 +72,8 @@ function toItemWithMeta(row: ItemCardRow): ItemWithMeta {
     isFavorite: row.isFavorite,
     isPinned: row.isPinned,
     language: row.language,
+    fileUrl: row.fileUrl,
+    fileName: row.fileName,
     type: row.itemType,
     tags: row.tags.map((t) => t.tag.name),
   };
@@ -178,8 +187,6 @@ export interface ItemCollectionSummary {
  */
 export interface ItemDetail extends ItemWithMeta {
   contentType: ContentType;
-  fileUrl: string | null;
-  fileName: string | null;
   fileSize: number | null;
   collections: ItemCollectionSummary[];
   createdAt: string;
@@ -200,8 +207,6 @@ export interface ItemDetail extends ItemWithMeta {
 const itemDetailSelect = {
   ...itemCardSelect,
   contentType: true,
-  fileUrl: true,
-  fileName: true,
   fileSize: true,
   createdAt: true,
   updatedAt: true,
@@ -214,8 +219,6 @@ const itemDetailSelect = {
 
 type ItemDetailRow = ItemCardRow & {
   contentType: ContentType;
-  fileUrl: string | null;
-  fileName: string | null;
   fileSize: number | null;
   createdAt: Date;
   updatedAt: Date;
@@ -227,8 +230,6 @@ function toItemDetail(row: ItemDetailRow): ItemDetail {
   return {
     ...toItemWithMeta(row),
     contentType: row.contentType,
-    fileUrl: row.fileUrl,
-    fileName: row.fileName,
     fileSize: row.fileSize,
     collections: row.collections.map((c) => c.collection),
     createdAt: row.createdAt.toISOString(),

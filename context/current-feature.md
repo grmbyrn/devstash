@@ -216,3 +216,36 @@ Branch: `feat/homepage`. Spec: @context/features/homepage-spec.md.
   - **UI-review findings left out of scope:** collection cards linking to the unbuilt `/collections/[id]`, a non-functional header search, no active state in the sidebar, the sidebar vanishing at 768px instead of becoming a rail, weak focus rings, small mobile tap targets in the drawer, and the duplicate disabled Copy button.
   - **Side note:** `.claude/agents/ui-reviewer.md` lists `mcp\_\_playwright\_\_*`; the escaped underscores match no tools, so the agent couldn't open a browser. It's untracked and not part of this commit.
   - Branch: `feat/shared-brand-nav`.
+
+- 2026-10-09 — **Image Gallery View** (Completed). Image items now render as thumbnail cards in a gallery grid instead of the regular text card.
+  - **New `src/components/dashboard/image-card.tsx`:**
+    - A 16:9 frame (`aspect-video`) with the image filling it (`object-cover`).
+    - A 5% hover zoom over 300ms (`motion-safe:group-hover:scale-105`), clipped by `overflow-hidden` on the frame.
+    - A title row with pin/star.
+    - Still a `<button>` calling `openItem`, so clicking opens the drawer.
+    - The image is a plain `<img>` through the `/api/files` proxy via `fileUrlForKey()`, lazy-loaded. `next/image` was ruled out because its optimizer fetches without the viewer's cookie, so the proxy would refuse it.
+    - The previewable-image check runs on the object **key**, whose extension was validated at upload, not the client-supplied `fileName`.
+    - A missing key or a failed load (`onError`) shows an `ImageOff` placeholder in the frame.
+  - **Scope: every grid.** `ItemCard` now branches on `item.type.name === "image"` and delegates to `ImageCard`; the old body became an internal `TextItemCard`. So `/items/images` and the dashboard's Pinned/Recent grids all get thumbnails with no call-site change. The branch sits in a wrapper rather than an early return, so neither card calls hooks conditionally. The spec's "3 columns" is the grid `/items/[type]` already had (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`), so the page itself didn't change.
+  - **Card data:** `ItemWithMeta` / `itemCardSelect` / `toItemWithMeta` in `src/lib/db/items.ts` gained `fileUrl` and `fileName`. This closes the File & Image Upload follow-up "the `ItemCard` grid preview shows nothing useful for uploads". `ItemDetail` already declared both fields, so its duplicates were removed and it now inherits them from the card shape.
+  - **Tests: 398, up from 397.** A new "card shape" case in `src/lib/db/items.test.ts` checks that the card select requests and returns both fields. Mutation-checked: removing them from the select failed exactly that test.
+  - **Verified in a browser** (Playwright MCP) against the user's running `next dev` on `127.0.0.1:3000`, which uses `.env` (the development database). A scratch production build was skipped because only 1.3 GB of disk was free and `.next` was already 1.3 GB. The disk had filled earlier in the session, losing a test run's output. Measured results:
+    - the frame is exactly 16:9 (1.778) at 1280, 768 and 390px;
+    - `object-fit: cover` cropped a square 1600×1600 test image;
+    - grid columns are 3/2/1;
+    - computed `scale` goes from `none` to `1.05` on hover, and stays `none` under reduced motion;
+    - transition 0.3s;
+    - no horizontal overflow;
+    - the card renders in the dashboard's Pinned and Recent grids;
+    - the proxy serves the image with a 200;
+    - the only console errors were the known HMR websocket failures.
+    - Note: Tailwind v4's `scale-105` sets the CSS `scale` property, not `transform`, so check `getComputedStyle(el).scale`.
+  - **Not exercised:** the `onError` fallback and click-to-open, which both need hydration, and `next dev` doesn't hydrate under automation.
+  - **DB / R2:** with the user's approval, one scratch image was uploaded through `/api/upload` and a pinned item row was inserted on the **development** branch (endpoint asserted first). Both were deleted afterwards: R2 confirmed the object gone, and the demo account is back to 18 items with 0 FILE items. Temp script, cookie jar and `.playwright-mcp/` were removed.
+  - **Session token:** the Playwright MCP tool echoed the demo user's session token in its own output (dev-only; it expires 2026-11-08).
+  - Lint and `tsc --noEmit` pass. No new deps, no schema change / migration.
+  - **Known follow-ups:**
+    - In mixed dashboard grids the taller image card stretches the text cards in its row (`items-start` would fix that at the cost of uneven heights).
+    - The image card has no type-color left border, unlike every other card.
+    - File (non-image) items still get the text card, which shows nothing useful for them.
+  - Branch: `feat/image-gallery-view`. Spec: @context/features/image-display-spec.md.

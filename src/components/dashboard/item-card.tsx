@@ -4,10 +4,23 @@ import { Pin, Star } from "lucide-react";
 
 import type { ItemWithMeta } from "@/lib/db/items";
 
+import { ImageCard } from "./image-card";
 import { useItemDrawer } from "./item-drawer-provider";
 import { ItemTypeIcon } from "./item-type-icon";
 
+/**
+ * Picks the card for an item's type, so every grid gets the image gallery card
+ * without its call site having to know which types it holds.
+ */
 export function ItemCard({ item }: { item: ItemWithMeta }) {
+  return item.type.name === "image" ? (
+    <ImageCard item={item} />
+  ) : (
+    <TextItemCard item={item} />
+  );
+}
+
+function TextItemCard({ item }: { item: ItemWithMeta }) {
   const { openItem } = useItemDrawer();
   const accent = item.type.color;
   const preview = item.content?.trim() ?? item.url ?? item.description ?? "";

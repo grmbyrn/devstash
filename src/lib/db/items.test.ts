@@ -6,10 +6,14 @@ vi.mock("@/lib/prisma", async () => ({
   prisma: (await import("@/test/prisma-mock")).prismaMock,
 }));
 
-const { createItem, deleteItem, getItemByFileKey, getItemById, updateItem } =
-  await import(
-  "./items",
-);
+const {
+  createItem,
+  deleteItem,
+  getItemByFileKey,
+  getItemById,
+  getItemsByType,
+  updateItem,
+} = await import("./items");
 
 /**
  * `src/lib/db` is normally out of unit-test scope (thin I/O), but `getItemById`
@@ -113,6 +117,43 @@ describe("getItemById", () => {
  * tag replacement and the partial-update semantics that keep a save from
  * clearing a column the drawer never showed.
  */
+/**
+ * The image gallery card renders a thumbnail from the card shape alone, so the
+ * card select has to carry the object key — the drawer's detail fetch is too late.
+ */
+describe("card shape", () => {
+  it("carries the upload's key and name to the card", async () => {
+    prismaMock.item.findMany.mockResolvedValue([
+      {
+        id: "item_img",
+        title: "Architecture diagram",
+        content: null,
+        url: null,
+        description: null,
+        isFavorite: false,
+        isPinned: false,
+        language: null,
+        fileUrl: "user_1/abc.png",
+        fileName: "diagram.png",
+        itemType: { id: "type_image", name: "image", icon: "Image", color: "#ec4899" },
+        tags: [],
+      },
+    ]);
+
+    const [card] = await getItemsByType("user_1", "type_image");
+
+    expect(prismaMock.item.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ fileUrl: true, fileName: true }),
+      }),
+    );
+    expect(card).toMatchObject({
+      fileUrl: "user_1/abc.png",
+      fileName: "diagram.png",
+    });
+  });
+});
+
 describe("updateItem", () => {
   const updatedRow = {
     id: "item_1",
