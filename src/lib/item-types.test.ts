@@ -3,12 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   editableFields,
   findTypeBySlug,
-  isCreatableType,
+  isUploadType,
   typeLabel,
   typeSlug,
   rendersAsMarkdown,
   usesMarkdown,
 } from "@/lib/item-types";
+import { uploadKindFor } from "@/lib/uploads";
 
 /** The seeded system types, in the order `prisma/seed.ts` creates them. */
 const SYSTEM_TYPE_NAMES = [
@@ -121,24 +122,35 @@ describe("editableFields", () => {
   });
 });
 
-describe("isCreatableType", () => {
-  it("allows the five types that are created by typing", () => {
+describe("isUploadType", () => {
+  /**
+   * File and image items exist because something was uploaded: the row carries
+   * `fileUrl`/`fileName`/`fileSize` and `contentType: FILE` rather than a text
+   * body, and the create action refuses one submitted without a stored object.
+   */
+  it("covers the two upload-backed types", () => {
+    expect(isUploadType("file")).toBe(true);
+    expect(isUploadType("image")).toBe(true);
+  });
+
+  it("is false for the five types created by typing", () => {
     for (const name of ["snippet", "prompt", "command", "note", "link"]) {
-      expect(isCreatableType(name)).toBe(true);
+      expect(isUploadType(name), name).toBe(false);
     }
   });
 
-  /**
-   * File and image items exist because something was uploaded — creating one
-   * from a form would write a FILE item with no file.
-   */
-  it("refuses the upload-backed types", () => {
-    expect(isCreatableType("file")).toBe(false);
-    expect(isCreatableType("image")).toBe(false);
+  it("is false for an unknown type, so a future custom one isn't sent to R2", () => {
+    expect(isUploadType("custom-thing")).toBe(false);
   });
 
-  it("allows an unknown type rather than blocking a future custom one", () => {
-    expect(isCreatableType("custom-thing")).toBe(true);
+  it("agrees with the upload rules about which types take a file", () => {
+    // Two modules answer "does this type take an upload?" — `item-types` for
+    // the form, `uploads` for the rules. A type in one but not the other would
+    // either show an upload field with no limits or enforce limits on a field
+    // that never renders.
+    for (const name of SYSTEM_TYPE_NAMES) {
+      expect(isUploadType(name), name).toBe(uploadKindFor(name) !== null);
+    }
   });
 });
 

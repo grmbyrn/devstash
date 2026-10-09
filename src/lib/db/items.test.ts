@@ -6,7 +6,8 @@ vi.mock("@/lib/prisma", async () => ({
   prisma: (await import("@/test/prisma-mock")).prismaMock,
 }));
 
-const { createItem, deleteItem, getItemById, updateItem } = await import(
+const { createItem, deleteItem, getItemByFileKey, getItemById, updateItem } =
+  await import(
   "./items",
 );
 
@@ -234,7 +235,7 @@ describe("updateItem", () => {
  */
 describe("deleteItem", () => {
   beforeEach(() => {
-    prismaMock.item.delete.mockResolvedValue({ id: "item_1" });
+    prismaMock.item.delete.mockResolvedValue({ fileUrl: null });
   });
 
   it("scopes the delete to the requesting user, not just the id", async () => {
@@ -242,11 +243,29 @@ describe("deleteItem", () => {
 
     expect(prismaMock.item.delete).toHaveBeenCalledWith({
       where: { id: "item_1", userId: "user_1" },
+      select: { fileUrl: true },
     });
   });
 
-  it("reports success when the item was deleted", async () => {
-    await expect(deleteItem("user_1", "item_1")).resolves.toBe(true);
+  it("reports success with no key for a text item", async () => {
+    await expect(deleteItem("user_1", "item_1")).resolves.toEqual({
+      deleted: true,
+      fileKey: null,
+    });
+  });
+
+  /**
+   * The R2 key has to come back from the delete itself: once this resolves the
+   * row is gone, so a separate read beforehand would be both an extra round
+   * trip and a window in which the two could disagree.
+   */
+  it("returns the R2 key of an upload so the caller can clean it up", async () => {
+    prismaMock.item.delete.mockResolvedValue({ fileUrl: "user_1/abc.png" });
+
+    await expect(deleteItem("user_1", "item_1")).resolves.toEqual({
+      deleted: true,
+      fileKey: "user_1/abc.png",
+    });
   });
 
   /**
@@ -261,7 +280,21 @@ describe("deleteItem", () => {
       }),
     );
 
-    await expect(deleteItem("user_2", "item_1")).resolves.toBe(false);
+    await expect(deleteItem("user_2", "item_1")).resolves.toBeNull();
+  });
+
+  it("distinguishes a text item deleted from no item deleted", async () => {
+    // `{ fileKey: null }` means "deleted, nothing to clean up"; `null` means
+    // "nothing happened" — the action branches on the difference.
+    const deletedText = await deleteItem("user_1", "item_1");
+
+    prismaMock.item.delete.mockRejectedValue(
+      Object.assign(new Error("Record to delete does not exist."), { code: "P2025" }),
+    );
+    const missing = await deleteItem("user_1", "item_2");
+
+    expect(deletedText).not.toBeNull();
+    expect(missing).toBeNull();
   });
 
   it("rethrows a genuine database failure instead of masking it as not-found", async () => {
@@ -272,6 +305,39 @@ describe("deleteItem", () => {
     await expect(deleteItem("user_1", "item_1")).rejects.toThrow(
       "connection refused",
     );
+  });
+});
+
+/**
+ * The authorisation check behind `GET /api/files/[...key]`. A private bucket is
+ * only meaningful if possession of a key proves nothing — what counts is an
+ * item *of this user's* referencing it.
+ */
+describe("getItemByFileKey", () => {
+  beforeEach(() => {
+    prismaMock.item.findFirst.mockResolvedValue({ id: "item_1", fileName: "pic.png" });
+  });
+
+  it("scopes the lookup to the user as well as the key", async () => {
+    await getItemByFileKey("user_1", "user_1/abc.png");
+
+    expect(prismaMock.item.findFirst).toHaveBeenCalledWith({
+      where: { userId: "user_1", fileUrl: "user_1/abc.png" },
+      select: { id: true, fileName: true },
+    });
+  });
+
+  it("returns the id and display name for the owner", async () => {
+    await expect(getItemByFileKey("user_1", "user_1/abc.png")).resolves.toEqual({
+      id: "item_1",
+      fileName: "pic.png",
+    });
+  });
+
+  it("returns null when no item of the user's points at the key", async () => {
+    prismaMock.item.findFirst.mockResolvedValue(null);
+
+    await expect(getItemByFileKey("user_2", "user_1/abc.png")).resolves.toBeNull();
   });
 });
 
@@ -323,11 +389,40 @@ describe("createItem", () => {
     expect(data.itemType).toEqual({ connect: { id: "type_snippet" } });
   });
 
-  it("stamps every created item as text content", async () => {
+  it("defaults to text content when the caller says nothing", async () => {
     await createItem("user_1", { itemTypeId: "type_note", title: "t" });
 
     const { data } = prismaMock.item.create.mock.calls[0][0];
     expect(data.contentType).toBe("TEXT");
+  });
+
+  it("writes the file columns and FILE content type for an upload", async () => {
+    await createItem("user_1", {
+      itemTypeId: "type_image",
+      title: "Logo",
+      contentType: "FILE",
+      fileUrl: "user_1/abc.png",
+      fileName: "logo.png",
+      fileSize: 2048,
+    });
+
+    const { data } = prismaMock.item.create.mock.calls[0][0];
+    expect(data).toMatchObject({
+      contentType: "FILE",
+      // The R2 object *key*, not a fetchable URL — the bucket is private.
+      fileUrl: "user_1/abc.png",
+      fileName: "logo.png",
+      fileSize: 2048,
+    });
+  });
+
+  it("leaves the file columns alone for a text item", async () => {
+    await createItem("user_1", { itemTypeId: "type_snippet", title: "t" });
+
+    const { data } = prismaMock.item.create.mock.calls[0][0];
+    expect(data).not.toHaveProperty("fileUrl");
+    expect(data).not.toHaveProperty("fileName");
+    expect(data).not.toHaveProperty("fileSize");
   });
 
   it("writes only the fields it was given", async () => {

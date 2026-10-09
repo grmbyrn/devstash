@@ -223,3 +223,104 @@ describe("createItemSchema", () => {
     expect(result).not.toHaveProperty("isPinned");
   });
 });
+
+describe("createItemSchema — upload fields", () => {
+  const upload = {
+    itemTypeId: "type_image",
+    title: "Logo",
+    fileKey: "user_1/abc123.png",
+    fileName: "logo.png",
+    fileSize: 2048,
+  };
+
+  it("accepts a key, name and size", () => {
+    const result = createItemSchema.parse(upload);
+
+    expect(result).toMatchObject({
+      fileKey: "user_1/abc123.png",
+      fileName: "logo.png",
+      fileSize: 2048,
+    });
+  });
+
+  it("leaves them undefined when the payload omits them", () => {
+    // A text item sends none of these, and must not acquire null columns.
+    const result = createItemSchema.parse({
+      itemTypeId: "type_snippet",
+      title: "t",
+    });
+
+    expect(result.fileKey).toBeUndefined();
+    expect(result.fileSize).toBeUndefined();
+  });
+
+  it("refuses a size larger than the biggest upload tier", () => {
+    const result = createItemSchema.safeParse({
+      ...upload,
+      fileSize: 11 * 1024 * 1024,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("refuses a negative, zero or fractional size", () => {
+    for (const fileSize of [-1, 0, 12.5]) {
+      expect(createItemSchema.safeParse({ ...upload, fileSize }).success).toBe(false);
+    }
+  });
+
+  it("refuses a size that isn't a number", () => {
+    expect(
+      createItemSchema.safeParse({ ...upload, fileSize: "2048" }).success,
+    ).toBe(false);
+  });
+
+  it("accepts a null size, since it is display-only", () => {
+    expect(createItemSchema.safeParse({ ...upload, fileSize: null }).success).toBe(true);
+  });
+
+  it("refuses an absurdly long file name", () => {
+    // It is stored, rendered, and echoed into the download's
+    // `Content-Disposition`, so an unbounded name is both junk in the column
+    // and an oversized response header.
+    const result = createItemSchema.safeParse({
+      ...upload,
+      fileName: `${"a".repeat(300)}.png`,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a file name at the 255-character convention", () => {
+    const name = `${"a".repeat(251)}.png`;
+    expect(createItemSchema.safeParse({ ...upload, fileName: name }).success).toBe(true);
+  });
+
+  it("trims the key and treats a blank one as absent", () => {
+    // A blank key reaching the action is refused there as "upload a file
+    // first" — the schema's job is only to normalise it to null.
+    expect(createItemSchema.parse({ ...upload, fileKey: "  " }).fileKey).toBeNull();
+  });
+
+  /**
+   * The schema deliberately doesn't check that the key belongs to the caller:
+   * that needs the session, so it lives in the action. This pins the division —
+   * a key naming another user parses fine and is rejected later.
+   */
+  it("does not police key ownership, which the action does", () => {
+    expect(
+      createItemSchema.safeParse({ ...upload, fileKey: "user_2/abc.png" }).success,
+    ).toBe(true);
+  });
+
+  it("is not part of the update payload, so an edit can't repoint a file", () => {
+    const result = updateItemSchema.parse({
+      title: "t",
+      fileKey: "user_1/other.png",
+      fileSize: 10,
+    });
+
+    expect(result).not.toHaveProperty("fileKey");
+    expect(result).not.toHaveProperty("fileSize");
+  });
+});
