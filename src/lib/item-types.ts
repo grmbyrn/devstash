@@ -57,17 +57,22 @@ export function editableFields(typeName: string): EditableFields {
 }
 
 /**
- * Whether an item of this type can be created by typing into a form.
+ * Whether an item of this type is created by uploading an object rather than by
+ * typing a body.
  *
- * File and image items are `ContentType.FILE`: they exist because something was
- * uploaded, and their body is an R2 URL rather than text. Uploads aren't wired
- * up, so the create dialog offers the five text types only — and the server
- * checks this too, so a hand-made payload can't create an empty file item.
+ * File and image items are `ContentType.FILE`: their body lives in R2 and the
+ * row carries `fileUrl`/`fileName`/`fileSize` instead of `content`. Every
+ * creatable type is now one or the other, which is why this replaced the old
+ * `isCreatableType` — with uploads wired up, nothing is uncreatable any more,
+ * so the question worth asking is which *kind* of create a type needs.
+ *
+ * The create action re-checks this: an upload type submitted without a stored
+ * object is refused, and file fields sent for a text type are dropped.
  */
 const FILE_UPLOAD_TYPES = new Set(["file", "image"]);
 
-export function isCreatableType(typeName: string): boolean {
-  return !FILE_UPLOAD_TYPES.has(typeName);
+export function isUploadType(typeName: string): boolean {
+  return FILE_UPLOAD_TYPES.has(typeName);
 }
 
 /**

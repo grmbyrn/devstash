@@ -18,11 +18,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
+import { FileUpload, type UploadedFile } from "@/components/ui/file-upload";
 import { Input } from "@/components/ui/input";
 import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { Textarea } from "@/components/ui/textarea";
 import type { ItemTypeSummary } from "@/lib/db/items";
-import { editableFields, rendersAsMarkdown } from "@/lib/item-types";
+import { editableFields, isUploadType, rendersAsMarkdown } from "@/lib/item-types";
+import { uploadKindFor } from "@/lib/uploads";
 import { parseTagInput } from "@/lib/validations/item";
 import { cn } from "@/lib/utils";
 
@@ -53,7 +55,8 @@ export function NewItemButton({ itemTypes }: { itemTypes: ItemTypeSummary[] }) {
         <DialogHeader>
           <DialogTitle>New item</DialogTitle>
           <DialogDescription>
-            Save a snippet, prompt, command, note or link to your stash.
+            Save a snippet, prompt, command, note, link, file or image to your
+            stash.
           </DialogDescription>
         </DialogHeader>
         {/* Radix unmounts the content on close, so the form's state resets
@@ -90,15 +93,22 @@ function NewItemForm({
   const [language, setLanguage] = React.useState("");
   const [url, setUrl] = React.useState("");
   const [tagInput, setTagInput] = React.useState("");
+  const [upload, setUpload] = React.useState<UploadedFile | null>(null);
   const [isSaving, setSaving] = React.useState(false);
 
   const selectedType =
     itemTypes.find((type) => type.id === itemTypeId) ?? itemTypes[0];
   const fields = editableFields(selectedType.name);
+  // File and image items are the upload types: their body is a stored object
+  // rather than text, so they show the upload field in place of an editor.
+  const isUpload = isUploadType(selectedType.name);
+  const uploadKind = uploadKindFor(selectedType.name);
 
   const canSave =
     title.trim().length > 0 &&
     (!fields.url || url.trim().length > 0) &&
+    // An upload type with nothing uploaded would be a row pointing at nothing.
+    (!isUpload || upload !== null) &&
     !isSaving;
 
   async function handleSubmit(event: React.FormEvent) {
@@ -115,6 +125,15 @@ function NewItemForm({
         ...(fields.content ? { content } : {}),
         ...(fields.language ? { language } : {}),
         ...(fields.url ? { url } : {}),
+        // Only the key is sent — the object is already in R2 by now. The action
+        // re-checks that the key's prefix matches the session.
+        ...(isUpload && upload
+          ? {
+              fileKey: upload.key,
+              fileName: upload.fileName,
+              fileSize: upload.fileSize,
+            }
+          : {}),
       });
 
       if (!result.success) {
@@ -140,7 +159,7 @@ function NewItemForm({
         <legend className="mb-1.5 text-xs font-medium text-muted-foreground">
           Type
         </legend>
-        <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
+        <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
           {itemTypes.map((type) => {
             const isSelected = type.id === selectedType.id;
             return (
@@ -185,6 +204,20 @@ function NewItemForm({
           onChange={(e) => setDescription(e.target.value)}
         />
       </Field>
+
+      {isUpload && uploadKind && (
+        // No `htmlFor`: the component owns its own file input and labels it
+        // internally, so a label aimed at the wrapper would point at nothing.
+        <Field label={uploadKind === "image" ? "Image" : "File"}>
+          <FileUpload
+            typeName={selectedType.name}
+            kind={uploadKind}
+            value={upload}
+            onChange={setUpload}
+            disabled={isSaving}
+          />
+        </Field>
+      )}
 
       {fields.url && (
         <Field label="URL" htmlFor="new-item-url">

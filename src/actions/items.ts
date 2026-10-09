@@ -8,7 +8,9 @@ import {
   updateItem as updateItemQuery,
 } from "@/lib/db/items";
 import type { CreateItemData, ItemDetail } from "@/lib/db/items";
-import { editableFields, isCreatableType } from "@/lib/item-types";
+import { editableFields, isUploadType } from "@/lib/item-types";
+import { deleteObjectQuietly, objectKeyOwner } from "@/lib/r2";
+import { fileExtension, isExtensionAllowed, uploadKindFor } from "@/lib/uploads";
 import { createItemSchema, updateItemSchema } from "@/lib/validations/item";
 
 /**
@@ -23,15 +25,17 @@ export type ActionResult<T> =
 /**
  * Create an item from the "New item" dialog.
  *
- * Two things the schema can't decide are settled here, because both need the
+ * Three things the schema can't decide are settled here, because each needs the
  * actual type row:
  *
  * - The client picks `itemTypeId`, so it's resolved against the real system
- *   types. An unknown id, or one naming an upload type, is refused rather than
- *   handed to the database.
+ *   types. An unknown id is refused rather than handed to the database.
  * - The payload is then narrowed to the fields that type uses, so a snippet
  *   can't be given a `url` and a link can't be given `content`, whatever the
- *   form sent.
+ *   form sent. Upload types get the file columns and no body; text types get a
+ *   body and no file columns, even if the request carried both.
+ * - A `fileKey` is only accepted when its prefix names the signed-in user, so
+ *   a hand-made payload can't point a new item at someone else's object.
  *
  * Returns the new item's `ItemDetail`, the same shape `updateItem` returns.
  */
@@ -57,10 +61,11 @@ export async function createItem(
     const itemType = (await getSystemItemTypes()).find(
       (type) => type.id === itemTypeId,
     );
-    if (!itemType || !isCreatableType(itemType.name)) {
+    if (!itemType) {
       return { success: false, error: "Choose an item type." };
     }
 
+    const isUpload = isUploadType(itemType.name);
     const fields = editableFields(itemType.name);
     const data: CreateItemData = {
       itemTypeId,
@@ -78,9 +83,54 @@ export async function createItem(
       return { success: false, error: "URL is required for links." };
     }
 
-    const item = await createItemQuery(session.user.id, data);
+    if (isUpload) {
+      // The object is already in R2 by now: the dialog uploads first and sends
+      // the key it got back. A file item without one would be a row pointing at
+      // nothing, so it is refused rather than created empty.
+      if (!rest.fileKey) {
+        return { success: false, error: "Upload a file first." };
+      }
 
-    return { success: true, data: item };
+      // Keys are `{userId}/{uuid}{ext}`. Checking the prefix against the
+      // session is what stops a crafted payload adopting another user's object
+      // — the upload route builds keys from the session, so a legitimate one
+      // always matches.
+      if (objectKeyOwner(rest.fileKey) !== session.user.id) {
+        return { success: false, error: "That upload isn't available." };
+      }
+
+      // The upload route validated the extension for the type the file was
+      // uploaded *as*, which need not be the type the item is being created
+      // as — switching type in the dialog, or a hand-made payload, can pair a
+      // .pdf key with an image item. Re-checking against the chosen type is
+      // what keeps `Item.contentType`/type and the stored object consistent.
+      const kind = uploadKindFor(itemType.name);
+      if (!kind || !isExtensionAllowed(kind, fileExtension(rest.fileKey))) {
+        return {
+          success: false,
+          error: `That file isn't a supported ${itemType.name}.`,
+        };
+      }
+
+      data.contentType = "FILE";
+      data.fileUrl = rest.fileKey;
+      data.fileName = rest.fileName ?? null;
+      data.fileSize = rest.fileSize ?? null;
+    }
+
+    try {
+      const item = await createItemQuery(session.user.id, data);
+      return { success: true, data: item };
+    } catch (error) {
+      // The upload succeeded but the row didn't, so the object is already
+      // orphaned — remove it rather than leaving it stranded in the bucket.
+      // Best-effort: a failed cleanup is logged, never shown, and never
+      // replaces the create failure the user actually needs to hear about.
+      if (isUpload && data.fileUrl) {
+        await deleteObjectQuietly(data.fileUrl);
+      }
+      throw error;
+    }
   } catch (error) {
     // Log for the server, but never hand the client a database message.
     console.error("Item create error:", error);
@@ -146,6 +196,13 @@ export async function updateItem(
  * The confirmation dialog in front of this is a UX gate, not the rule: the auth
  * check and the ownership filter inside the query are what actually decide.
  * A foreign or unknown id reports the same "Item not found." as each other.
+ *
+ * For an upload, the stored object goes too. The row is deleted first and the
+ * object cleaned up after, deliberately in that order: a delete that leaves an
+ * unreferenced object behind wastes storage, whereas one that removes the
+ * object but keeps the row would leave a visible item whose file 404s. The
+ * cleanup is best-effort for the same reason — the user's delete succeeded, and
+ * an R2 outage shouldn't report otherwise.
  */
 export async function deleteItem(itemId: string): Promise<ActionResult<null>> {
   try {
@@ -161,6 +218,10 @@ export async function deleteItem(itemId: string): Promise<ActionResult<null>> {
     const deleted = await deleteItemQuery(session.user.id, itemId);
     if (!deleted) {
       return { success: false, error: "Item not found." };
+    }
+
+    if (deleted.fileKey) {
+      await deleteObjectQuietly(deleted.fileKey);
     }
 
     return { success: true, data: null };

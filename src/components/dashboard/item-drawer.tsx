@@ -4,7 +4,9 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
   Copy,
+  Download,
   ExternalLink,
+  File as FileIcon,
   FolderPlus,
   Pencil,
   Pin,
@@ -25,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { ItemDetail, ItemWithMeta } from "@/lib/db/items";
 import { formatFileSize, relativeTime } from "@/lib/format";
 import { editableFields, rendersAsMarkdown } from "@/lib/item-types";
+import { fileUrlForKey, isPreviewableImage } from "@/lib/uploads";
 import { parseTagInput } from "@/lib/validations/item";
 import { cn } from "@/lib/utils";
 
@@ -327,21 +330,7 @@ function ItemBody({ item }: { item: ItemDetail }) {
           </pre>
         ))}
 
-      {item.fileUrl && (
-        <a
-          href={item.fileUrl}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm hover:bg-accent"
-        >
-          <span className="min-w-0 truncate">{item.fileName ?? "File"}</span>
-          {item.fileSize !== null && (
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {formatFileSize(item.fileSize)}
-            </span>
-          )}
-        </a>
-      )}
+      {item.fileUrl && <StoredFile item={item} />}
 
       <Section icon={<Tag className="size-3.5" />} title="Tags">
         {item.tags.length > 0 ? (
@@ -379,6 +368,59 @@ function ItemBody({ item }: { item: ItemDetail }) {
         )}
       </Section>
     </>
+  );
+}
+
+/**
+ * An item's uploaded object: an inline preview for images, a labelled card for
+ * everything else, and a download link for both.
+ *
+ * `item.fileUrl` holds the R2 object *key*, not a URL — the bucket is private.
+ * Every read goes through `/api/files/[...key]`, which re-checks that the
+ * signed-in user owns this item before serving a byte.
+ */
+function StoredFile({ item }: { item: ItemDetail }) {
+  const key = item.fileUrl;
+  if (!key) return null;
+
+  const fileName = item.fileName ?? "Download";
+  const showImage = isPreviewableImage(fileName);
+
+  return (
+    <div className="flex flex-col gap-2">
+      {showImage ? (
+        // Deliberately not `next/image`: the optimizer fetches the source
+        // server-side without the viewer's cookies, so the authenticated proxy
+        // would answer it with a 401. A plain <img> carries the session.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={fileUrlForKey(key)}
+          alt={fileName}
+          className="max-h-80 w-full rounded-md border border-border bg-muted/30 object-contain"
+        />
+      ) : (
+        <div className="flex items-center gap-2.5 rounded-md border border-border p-3">
+          <FileIcon className="size-4 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 flex-1 truncate text-sm">{fileName}</span>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <Button asChild variant="outline" size="sm">
+          {/* `download` plus the route's attachment disposition, so a PDF or an
+              image saves rather than replacing the page. */}
+          <a href={fileUrlForKey(key, true)} download={fileName}>
+            <Download />
+            Download
+          </a>
+        </Button>
+        {item.fileSize !== null && (
+          <span className="text-xs text-muted-foreground">
+            {formatFileSize(item.fileSize)}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
 

@@ -4,6 +4,14 @@ import { z } from "zod";
 export const MAX_TAGS = 25;
 
 /**
+ * Ceiling for the reported `fileSize`, matching the largest upload tier (the
+ * 10 MB file type). The per-kind limits are enforced against the real bytes in
+ * `src/lib/uploads.ts`; this is only a sanity bound on a client-reported
+ * number, so one value for both kinds is enough.
+ */
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
+/**
  * An optional, nullable text field.
  *
  * Three input states are kept distinct, because they mean different things to
@@ -99,6 +107,28 @@ export const createItemSchema = z.object({
   language: nullableText,
   url: nullableUrl,
   tags: tagList,
+  // ── Upload fields, for the file and image types ──────────────────────────
+  //
+  // These describe an object the upload route has *already* stored, so they are
+  // reported by the client rather than chosen by it. None of them is trusted
+  // for authorisation: the action re-derives ownership from the session and the
+  // key's own prefix, and a key naming someone else's prefix is refused.
+  fileKey: nullableText,
+  // Capped at the filesystem convention: it is stored, rendered, and echoed
+  // into the download's `Content-Disposition`, so an unbounded name would both
+  // write junk to the column and build an oversized response header.
+  fileName: nullableText.refine(
+    (value) => value === undefined || value === null || value.length <= 255,
+    { message: "File name is too long" },
+  ),
+  // Display only — the authoritative size is the stored object's. Capped at the
+  // largest upload tier so a bogus number can't be written to the column.
+  fileSize: z
+    .number()
+    .int("File size must be a whole number")
+    .positive("File size must be positive")
+    .max(MAX_UPLOAD_BYTES, "File is too large")
+    .nullish(),
 });
 
 export type CreateItemInput = z.infer<typeof createItemSchema>;

@@ -14,6 +14,17 @@ vi.mock("@/lib/db/items", () => ({
   getSystemItemTypes: getSystemItemTypesMock,
 }));
 
+const deleteObjectQuietlyMock = vi.fn();
+vi.mock("@/lib/r2", async () => {
+  // `objectKeyOwner` is pure and is part of the rule the action enforces, so
+  // the real one is kept rather than stubbed.
+  const actual = await vi.importActual<typeof import("@/lib/r2")>("@/lib/r2");
+  return {
+    objectKeyOwner: actual.objectKeyOwner,
+    deleteObjectQuietly: deleteObjectQuietlyMock,
+  };
+});
+
 const { createItem, deleteItem, updateItem } = await import("./items");
 
 /** The system types the create action resolves `itemTypeId` against. */
@@ -22,6 +33,7 @@ const SYSTEM_TYPES = [
   { id: "type_note", name: "note", icon: "StickyNote", color: "#fde047" },
   { id: "type_link", name: "link", icon: "Link", color: "#10b981" },
   { id: "type_file", name: "file", icon: "File", color: "#6b7280" },
+  { id: "type_image", name: "image", icon: "Image", color: "#ec4899" },
 ];
 
 const SESSION = { user: { id: "user_1" } };
@@ -132,7 +144,7 @@ describe("updateItem action", () => {
 describe("deleteItem action", () => {
   beforeEach(() => {
     authMock.mockResolvedValue(SESSION);
-    deleteItemQueryMock.mockResolvedValue(true);
+    deleteItemQueryMock.mockResolvedValue({ deleted: true, fileKey: null });
   });
 
   it("deletes the item and reports success", async () => {
@@ -169,7 +181,7 @@ describe("deleteItem action", () => {
    * from the outside.
    */
   it("reports a foreign item exactly as it reports an unknown one", async () => {
-    deleteItemQueryMock.mockResolvedValue(false);
+    deleteItemQueryMock.mockResolvedValue(null);
 
     const foreign = await deleteItem("item_owned_by_someone_else");
     const unknown = await deleteItem("item_does_not_exist");
@@ -189,6 +201,51 @@ describe("deleteItem action", () => {
     expect(result.success).toBe(false);
     expect(result.error).toBe("Something went wrong. Please try again.");
     expect(result.error).not.toContain("db-prod-01");
+  });
+
+  describe("stored objects", () => {
+    it("removes the R2 object belonging to an upload", async () => {
+      deleteItemQueryMock.mockResolvedValue({
+        deleted: true,
+        fileKey: "user_1/abc.png",
+      });
+
+      const result = await deleteItem("item_1");
+
+      expect(result.success).toBe(true);
+      expect(deleteObjectQuietlyMock).toHaveBeenCalledWith("user_1/abc.png");
+    });
+
+    it("skips storage entirely for a text item", async () => {
+      await deleteItem("item_1");
+
+      expect(deleteObjectQuietlyMock).not.toHaveBeenCalled();
+    });
+
+    it("does not touch storage when there was nothing to delete", async () => {
+      // No row removed means the key was never ours to clean up.
+      deleteItemQueryMock.mockResolvedValue(null);
+
+      await deleteItem("item_1");
+
+      expect(deleteObjectQuietlyMock).not.toHaveBeenCalled();
+    });
+
+    it("still reports success when the object cleanup fails", async () => {
+      // The row is already gone, so the user's delete did succeed — an R2
+      // outage must not report otherwise. `deleteObjectQuietly` swallows the
+      // error itself; this pins that the action relies on that.
+      deleteItemQueryMock.mockResolvedValue({
+        deleted: true,
+        fileKey: "user_1/abc.png",
+      });
+      deleteObjectQuietlyMock.mockResolvedValue(undefined);
+
+      await expect(deleteItem("item_1")).resolves.toEqual({
+        success: true,
+        data: null,
+      });
+    });
   });
 });
 
@@ -261,11 +318,12 @@ describe("createItem action", () => {
     expect(createItemQueryMock).not.toHaveBeenCalled();
   });
 
-  it("refuses an upload-backed type, which has no file to point at", async () => {
+  it("refuses an upload-backed type with no uploaded object", async () => {
+    // A file item with no key would be a row pointing at nothing.
     const result = await createItem({ itemTypeId: "type_file", title: "t" });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe("Choose an item type.");
+    expect(result.error).toBe("Upload a file first.");
     expect(createItemQueryMock).not.toHaveBeenCalled();
   });
 
@@ -283,6 +341,132 @@ describe("createItem action", () => {
     // A note has no language and no url, whatever the payload claimed.
     expect(data).not.toHaveProperty("language");
     expect(data).not.toHaveProperty("url");
+  });
+
+  describe("upload types", () => {
+    const upload = {
+      itemTypeId: "type_image",
+      title: "Logo",
+      fileKey: "user_1/abc123.png",
+      fileName: "logo.png",
+      fileSize: 2048,
+    };
+
+    it("stores the key, name and size and marks the item as FILE", async () => {
+      await createItem(upload);
+
+      expect(createItemQueryMock.mock.calls[0][1]).toMatchObject({
+        contentType: "FILE",
+        fileUrl: "user_1/abc123.png",
+        fileName: "logo.png",
+        fileSize: 2048,
+      });
+    });
+
+    /**
+     * The key is client-supplied, and its prefix is the owner. Checking it
+     * against the session is what stops a crafted payload adopting another
+     * user's object — the upload route always builds keys from the session, so
+     * a legitimate key matches by construction.
+     */
+    it("refuses a key whose prefix names another user", async () => {
+      const result = await createItem({ ...upload, fileKey: "user_2/abc123.png" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("That upload isn't available.");
+      expect(createItemQueryMock).not.toHaveBeenCalled();
+    });
+
+    it("refuses a malformed key", async () => {
+      for (const fileKey of ["abc123.png", "user_1/nested/abc.png", "/abc.png"]) {
+        createItemQueryMock.mockClear();
+        const result = await createItem({ ...upload, fileKey });
+
+        expect(result.success, fileKey).toBe(false);
+        expect(createItemQueryMock).not.toHaveBeenCalled();
+      }
+    });
+
+    it("ignores a file key sent for a text type", async () => {
+      // A snippet carrying upload fields must not become a FILE item.
+      await createItem({
+        itemTypeId: "type_snippet",
+        title: "t",
+        content: "echo hi",
+        fileKey: "user_1/abc123.png",
+        fileName: "logo.png",
+        fileSize: 2048,
+      });
+
+      const data = createItemQueryMock.mock.calls[0][1];
+      expect(data).not.toHaveProperty("fileUrl");
+      expect(data).not.toHaveProperty("fileName");
+      expect(data).not.toHaveProperty("fileSize");
+      expect(data.contentType).toBeUndefined();
+    });
+
+    it("tolerates a missing name and size, which are display-only", async () => {
+      await createItem({ itemTypeId: "type_file", title: "t", fileKey: "user_1/a.pdf" });
+
+      expect(createItemQueryMock.mock.calls[0][1]).toMatchObject({
+        fileUrl: "user_1/a.pdf",
+        fileName: null,
+        fileSize: null,
+      });
+    });
+
+    it("refuses a negative or absurd reported size", async () => {
+      const tooBig = await createItem({ ...upload, fileSize: 999 * 1024 * 1024 });
+      const negative = await createItem({ ...upload, fileSize: -1 });
+
+      expect(tooBig.success).toBe(false);
+      expect(negative.success).toBe(false);
+      expect(createItemQueryMock).not.toHaveBeenCalled();
+    });
+
+    it("refuses a key whose extension is wrong for the chosen type", async () => {
+      // A .pdf uploaded as a `file` is valid; reusing that key for an `image`
+      // item is not — the type decides which extensions are allowed.
+      const result = await createItem({
+        itemTypeId: "type_image",
+        title: "Logo",
+        fileKey: "user_1/abc123.pdf",
+        fileName: "doc.pdf",
+        fileSize: 2048,
+      });
+
+      expect(result.success).toBe(false);
+      expect(createItemQueryMock).not.toHaveBeenCalled();
+    });
+
+    /**
+     * The object is in R2 before the row exists, so a failed create leaves it
+     * orphaned. Cleaning up here closes the common case.
+     */
+    it("removes the uploaded object when the create fails", async () => {
+      createItemQueryMock.mockRejectedValue(new Error("connection refused"));
+
+      const result = await createItem(upload);
+
+      expect(result.success).toBe(false);
+      expect(deleteObjectQuietlyMock).toHaveBeenCalledWith("user_1/abc123.png");
+    });
+
+    it("does not clean up after a successful create", async () => {
+      await createItem(upload);
+
+      expect(deleteObjectQuietlyMock).not.toHaveBeenCalled();
+    });
+
+    it("reports the create failure, not a cleanup problem", async () => {
+      createItemQueryMock.mockRejectedValue(new Error("connection refused"));
+
+      const result = await createItem(upload);
+
+      // The user needs to hear that the item wasn't created; the orphaned
+      // object is our problem, not theirs.
+      expect(result.error).toBe("Something went wrong. Please try again.");
+    });
   });
 
   it("keeps the url for a link and drops its content", async () => {

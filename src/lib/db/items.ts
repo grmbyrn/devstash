@@ -267,6 +267,15 @@ export interface CreateItemData {
   language?: string | null;
   url?: string | null;
   tags?: string[];
+  /**
+   * `FILE` for the file and image types, whose body is an uploaded object.
+   * Defaults to `TEXT`, which is what every typed-in type is.
+   */
+  contentType?: ContentType;
+  /** The R2 object key — not a fetchable URL. See `src/lib/r2.ts`. */
+  fileUrl?: string | null;
+  fileName?: string | null;
+  fileSize?: number | null;
 }
 
 /**
@@ -283,7 +292,7 @@ export async function createItem(
   userId: string,
   data: CreateItemData,
 ): Promise<ItemDetail> {
-  const { tags, itemTypeId, ...fields } = data;
+  const { tags, itemTypeId, contentType, ...fields } = data;
 
   // Undefined keys are dropped rather than written as null, so the columns a
   // type doesn't use keep their schema defaults.
@@ -295,9 +304,9 @@ export async function createItem(
     data: {
       ...scalars,
       title: data.title,
-      // Every creatable type is a text type. FILE is reserved for the file and
-      // image types, which are created by uploading and aren't wired up yet.
-      contentType: "TEXT",
+      // TEXT unless the caller says otherwise. The action decides, from the
+      // item type: FILE for file/image, TEXT for everything typed in.
+      contentType: contentType ?? "TEXT",
       user: { connect: { id: userId } },
       itemType: { connect: { id: itemTypeId } },
       ...(tags && tags.length > 0
@@ -391,7 +400,17 @@ export async function updateItem(
 }
 
 /**
- * Delete one item, returning whether it was there to delete.
+ * Delete one item, returning the R2 object key it was holding — or `null` when
+ * there was nothing to delete.
+ *
+ * The key comes back rather than a bare boolean so the caller can remove the
+ * stored object afterwards. It has to be returned *by the delete itself*: the
+ * row is gone once this resolves, so a separate read beforehand would be a
+ * second round trip and a window in which the two could disagree.
+ *
+ * `{ deleted: true, fileKey: null }` is a successful delete of a text item, and
+ * is deliberately distinct from `null` ("no such item"), so the caller can tell
+ * "nothing to clean up" from "nothing happened".
  *
  * Ownership sits in the `where` clause exactly as it does for `getItemById` and
  * `updateItem`, so another user's item is never removed and reports the same
@@ -402,22 +421,52 @@ export async function updateItem(
  * schema's `onDelete: Cascade`. `Tag` rows left with no items are *not* cleaned
  * up here, matching `updateItem`.
  */
+export interface DeletedItem {
+  deleted: true;
+  /** The R2 object key the item pointed at, if it was an upload. */
+  fileKey: string | null;
+}
+
 export async function deleteItem(
   userId: string,
   id: string,
-): Promise<boolean> {
+): Promise<DeletedItem | null> {
   try {
-    await prisma.item.delete({
+    const row = await prisma.item.delete({
       // `id` alone is unique; `userId` narrows it so a foreign item matches
       // nothing and Prisma raises P2025 rather than deleting.
       where: { id, userId },
+      select: { fileUrl: true },
     });
 
-    return true;
+    return { deleted: true, fileKey: row.fileUrl };
   } catch (error) {
-    if (isRecordNotFound(error)) return false;
+    if (isRecordNotFound(error)) return null;
     throw error;
   }
+}
+
+/**
+ * Whether the signed-in user owns an item pointing at this R2 object key, and
+ * the display name to serve it under.
+ *
+ * This is the authorisation check behind `GET /api/files/[...key]`. Scoping by
+ * `userId` in the `where` clause — the same shape as every other read here —
+ * is what makes a private bucket meaningful: possession of a key proves
+ * nothing, only an item of yours referencing it does.
+ *
+ * `findFirst` rather than `findUnique` because `fileUrl` carries no unique
+ * constraint. Keys are random UUIDs under a per-user prefix, so in practice
+ * exactly one row matches.
+ */
+export async function getItemByFileKey(
+  userId: string,
+  fileKey: string,
+): Promise<{ id: string; fileName: string | null } | null> {
+  return prisma.item.findFirst({
+    where: { userId, fileUrl: fileKey },
+    select: { id: true, fileName: true },
+  });
 }
 
 /** True for Prisma's "record not found" error, without importing its namespace. */

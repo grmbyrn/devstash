@@ -83,13 +83,13 @@ describe("user scoping on dashboard queries", () => {
   });
 
   it("deleteItem scopes the delete to the user, not just the id", async () => {
-    prismaMock.item.delete.mockResolvedValue({ id: "item_1" });
+    prismaMock.item.delete.mockResolvedValue({ fileUrl: null });
 
     await items.deleteItem(USER, "item_1");
 
-    expect(prismaMock.item.delete).toHaveBeenCalledWith({
-      where: { id: "item_1", userId: USER },
-    });
+    expect(prismaMock.item.delete).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "item_1", userId: USER } }),
+    );
   });
 
   it("getItemStats counts only the user's items", async () => {
@@ -132,6 +132,24 @@ describe("user scoping on dashboard queries", () => {
     });
   });
 
+  /**
+   * The authorisation check behind the file proxy. A private bucket means
+   * possession of an object key proves nothing — only an item of this user's
+   * referencing it does. Losing the `userId` here would serve any user's
+   * uploads to anyone who learned a key.
+   */
+  it("getItemByFileKey scopes to the user as well as the key", async () => {
+    prismaMock.item.findFirst.mockResolvedValue(null);
+
+    await items.getItemByFileKey(USER, "user_1/abc.png");
+
+    expect(prismaMock.item.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: USER, fileUrl: "user_1/abc.png" },
+      }),
+    );
+  });
+
   it("no query filters by the seeded demo email any more", async () => {
     await Promise.all([
       items.getPinnedItems(USER),
@@ -139,11 +157,13 @@ describe("user scoping on dashboard queries", () => {
       items.getItemStats(USER),
       collections.getFavoriteCollections(USER),
       collections.getCollectionStats(USER),
+      items.getItemByFileKey(USER, "user_1/abc.png"),
     ]);
 
     const everyCall = [
       ...prismaMock.item.findMany.mock.calls,
       ...prismaMock.item.count.mock.calls,
+      ...prismaMock.item.findFirst.mock.calls,
       ...prismaMock.collection.findMany.mock.calls,
       ...prismaMock.collection.count.mock.calls,
     ];
