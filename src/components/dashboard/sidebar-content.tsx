@@ -8,6 +8,7 @@ import type {
   SidebarCollection,
 } from "@/lib/db/collections";
 import type { ItemTypeSummary } from "@/lib/db/items";
+import { LogoMark } from "@/components/site/logo";
 import { Badge } from "@/components/ui/badge";
 import { typeLabel, typeSlug } from "@/lib/item-types";
 import { cn } from "@/lib/utils";
@@ -41,9 +42,7 @@ export function SidebarContent({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex h-14 items-center gap-2 border-b border-border px-4">
-        <div className="grid size-7 place-items-center rounded-md bg-primary text-primary-foreground text-xs font-semibold">
-          DS
-        </div>
+        <LogoMark className="size-7" />
         {!compact && (
           <span className="text-sm font-semibold tracking-tight">
             DevStash

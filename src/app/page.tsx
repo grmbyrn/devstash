@@ -6,7 +6,7 @@ import { Cta } from "@/components/homepage/cta";
 import { Features } from "@/components/homepage/features";
 import { Footer } from "@/components/homepage/footer";
 import { Hero } from "@/components/homepage/hero";
-import { Navbar } from "@/components/homepage/navbar";
+import { Navbar } from "@/components/site/navbar";
 import { Pricing } from "@/components/homepage/pricing";
 
 export const metadata: Metadata = {

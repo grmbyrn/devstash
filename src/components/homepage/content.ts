@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { GithubIcon } from "@/components/auth/github-icon";
+import { SECTION_LINKS } from "@/components/site/links";
 import type { SystemTypeName } from "@/lib/system-types";
 
 import { NotionIcon, SlackIcon, VsCodeIcon } from "./brand-icons";
@@ -33,11 +34,6 @@ export function primaryCta(signedIn: boolean): CallToAction {
     ? { href: "/dashboard", label: "Go to Dashboard" }
     : { href: "/register", label: "Get Started Free" };
 }
-
-export const SECTION_LINKS: CallToAction[] = [
-  { href: "#features", label: "Features" },
-  { href: "#pricing", label: "Pricing" },
-];
 
 // ─── Hero ────────────────────────────────────────────────────────────────
 

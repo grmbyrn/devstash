@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { Check, X } from "lucide-react";
 
+import { Container } from "@/components/site/container";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { BillingProvider, BillingSwitch, PlanPriceDisplay } from "./billing";
 import { PLANS, type Plan } from "./content";
-import { Container, SectionHeading } from "./layout";
+import { SectionHeading } from "./layout";
 import { Reveal } from "./reveal";
 
 function PlanCard({ name, description, price, cta, features, highlighted }: Plan) {
