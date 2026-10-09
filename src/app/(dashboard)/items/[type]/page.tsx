@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { FileList } from "@/components/dashboard/file-list";
 import { ItemCard } from "@/components/dashboard/item-card";
 import { ItemTypeIcon } from "@/components/dashboard/item-type-icon";
 import { requireUser } from "@/lib/auth/session";
@@ -61,6 +62,8 @@ export default async function ItemsByTypePage({
         <p className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
           No {label.toLowerCase()} yet.
         </p>
+      ) : itemType.name === "file" ? (
+        <FileList items={items} />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => (

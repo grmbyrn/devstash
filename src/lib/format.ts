@@ -57,3 +57,21 @@ export function formatFileSize(bytes: number) {
   const rounded = unit === 0 ? size : Math.round(size * 10) / 10;
   return `${rounded} ${FILE_SIZE_UNITS[unit]}`;
 }
+
+const dateFormat = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+  timeZone: "UTC",
+});
+
+/**
+ * A calendar date, e.g. `Oct 9, 2026`.
+ *
+ * Pinned to UTC so the server render and the client hydration agree — a
+ * client component formatting in the viewer's zone would mismatch the
+ * server's output for anything uploaded near midnight.
+ */
+export function formatDate(value: string | Date) {
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return "";
+  return dateFormat.format(date);
+}

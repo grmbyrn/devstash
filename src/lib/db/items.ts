@@ -25,6 +25,9 @@ export interface ItemWithMeta {
   /** The R2 object *key* for uploads (never a URL — the bucket is private). */
   fileUrl: string | null;
   fileName: string | null;
+  fileSize: number | null;
+  /** ISO string — this crosses to client components, where `Date` doesn't survive. */
+  createdAt: string;
   type: ItemTypeSummary;
   /** Tag names, ordered as returned by the database. */
   tags: string[];
@@ -43,6 +46,8 @@ const itemCardSelect = {
   language: true,
   fileUrl: true,
   fileName: true,
+  fileSize: true,
+  createdAt: true,
   itemType: { select: { id: true, name: true, icon: true, color: true } },
   tags: { select: { tag: { select: { name: true } } } },
 } as const;
@@ -58,6 +63,8 @@ type ItemCardRow = {
   language: string | null;
   fileUrl: string | null;
   fileName: string | null;
+  fileSize: number | null;
+  createdAt: Date;
   itemType: ItemTypeSummary;
   tags: { tag: { name: string } }[];
 };
@@ -74,6 +81,8 @@ function toItemWithMeta(row: ItemCardRow): ItemWithMeta {
     language: row.language,
     fileUrl: row.fileUrl,
     fileName: row.fileName,
+    fileSize: row.fileSize,
+    createdAt: row.createdAt.toISOString(),
     type: row.itemType,
     tags: row.tags.map((t) => t.tag.name),
   };
@@ -187,9 +196,7 @@ export interface ItemCollectionSummary {
  */
 export interface ItemDetail extends ItemWithMeta {
   contentType: ContentType;
-  fileSize: number | null;
   collections: ItemCollectionSummary[];
-  createdAt: string;
   updatedAt: string;
   lastUsedAt: string | null;
 }
@@ -207,8 +214,6 @@ export interface ItemDetail extends ItemWithMeta {
 const itemDetailSelect = {
   ...itemCardSelect,
   contentType: true,
-  fileSize: true,
-  createdAt: true,
   updatedAt: true,
   lastUsedAt: true,
   collections: {
@@ -219,8 +224,6 @@ const itemDetailSelect = {
 
 type ItemDetailRow = ItemCardRow & {
   contentType: ContentType;
-  fileSize: number | null;
-  createdAt: Date;
   updatedAt: Date;
   lastUsedAt: Date | null;
   collections: { collection: ItemCollectionSummary }[];
@@ -230,9 +233,7 @@ function toItemDetail(row: ItemDetailRow): ItemDetail {
   return {
     ...toItemWithMeta(row),
     contentType: row.contentType,
-    fileSize: row.fileSize,
     collections: row.collections.map((c) => c.collection),
-    createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
   };

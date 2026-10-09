@@ -118,11 +118,12 @@ describe("getItemById", () => {
  * clearing a column the drawer never showed.
  */
 /**
- * The image gallery card renders a thumbnail from the card shape alone, so the
- * card select has to carry the object key — the drawer's detail fetch is too late.
+ * The image gallery card renders a thumbnail from the card shape alone, and the
+ * file list shows size and upload date, so the card select has to carry them —
+ * the drawer's detail fetch is too late.
  */
 describe("card shape", () => {
-  it("carries the upload's key and name to the card", async () => {
+  it("carries the upload's key, name, size and date to the card", async () => {
     prismaMock.item.findMany.mockResolvedValue([
       {
         id: "item_img",
@@ -135,6 +136,8 @@ describe("card shape", () => {
         language: null,
         fileUrl: "user_1/abc.png",
         fileName: "diagram.png",
+        fileSize: 48213,
+        createdAt: new Date("2026-10-01T09:30:00.000Z"),
         itemType: { id: "type_image", name: "image", icon: "Image", color: "#ec4899" },
         tags: [],
       },
@@ -144,12 +147,19 @@ describe("card shape", () => {
 
     expect(prismaMock.item.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        select: expect.objectContaining({ fileUrl: true, fileName: true }),
+        select: expect.objectContaining({
+          fileUrl: true,
+          fileName: true,
+          fileSize: true,
+          createdAt: true,
+        }),
       }),
     );
     expect(card).toMatchObject({
       fileUrl: "user_1/abc.png",
       fileName: "diagram.png",
+      fileSize: 48213,
+      createdAt: "2026-10-01T09:30:00.000Z",
     });
   });
 });
