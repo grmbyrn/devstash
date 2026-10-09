@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatFileSize, relativeTime } from "./format";
+import { formatDate, formatFileSize, relativeTime } from "./format";
 
 // Fixed reference point so these never depend on the wall clock.
 const NOW = new Date("2026-08-01T12:00:00.000Z");
@@ -73,5 +73,20 @@ describe("formatFileSize", () => {
   it("returns an empty string for nonsense input", () => {
     expect(formatFileSize(-1)).toBe("");
     expect(formatFileSize(Number.NaN)).toBe("");
+  });
+});
+
+describe("formatDate", () => {
+  it("formats an ISO string as a calendar date", () => {
+    expect(formatDate("2026-10-09T12:00:00.000Z")).toBe("Oct 9, 2026");
+  });
+
+  it("uses UTC, so late-evening uploads don't shift by a day", () => {
+    expect(formatDate("2026-10-09T23:59:00.000Z")).toBe("Oct 9, 2026");
+    expect(formatDate(new Date("2026-10-10T00:01:00.000Z"))).toBe("Oct 10, 2026");
+  });
+
+  it("returns an empty string for an invalid date", () => {
+    expect(formatDate("not a date")).toBe("");
   });
 });
