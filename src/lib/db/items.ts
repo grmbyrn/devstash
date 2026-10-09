@@ -2,6 +2,7 @@ import { cache } from "react";
 import type { ContentType } from "@/generated/prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { SYSTEM_TYPES } from "@/lib/system-types";
 
 /** The item type metadata a card needs to render its icon and accent. */
 export interface ItemTypeSummary {
@@ -125,15 +126,7 @@ export async function getItemsByType(
 
 // Canonical display order for the seeded system types; anything unknown
 // (e.g. future custom types) sorts to the end.
-const SYSTEM_TYPE_ORDER = [
-  "snippet",
-  "prompt",
-  "command",
-  "note",
-  "link",
-  "file",
-  "image",
-];
+const SYSTEM_TYPE_ORDER: string[] = SYSTEM_TYPES.map((type) => type.name);
 
 /**
  * The system item types for the sidebar type list, in canonical order.
