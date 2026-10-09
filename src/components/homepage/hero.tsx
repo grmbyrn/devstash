@@ -2,13 +2,14 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 import { ItemTypeIcon } from "@/components/dashboard/item-type-icon";
+import { Container } from "@/components/site/container";
 import { Button } from "@/components/ui/button";
 import { typeLabel } from "@/lib/item-types";
 import { SYSTEM_TYPES, systemType } from "@/lib/system-types";
 
 import { ChaosField } from "./chaos-field";
 import { PREVIEW_ITEMS, primaryCta } from "./content";
-import { accentStyle, Container } from "./layout";
+import { accentStyle } from "./layout";
 import { Reveal } from "./reveal";
 
 function Panel({ label, children }: { label: string; children: React.ReactNode }) {

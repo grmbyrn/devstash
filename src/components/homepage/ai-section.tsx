@@ -1,11 +1,11 @@
 import { Check, Sparkles } from "lucide-react";
 
+import { Container } from "@/components/site/container";
 import { Badge } from "@/components/ui/badge";
 import { WindowDots } from "@/components/ui/editor-chrome";
 
 import { AiTags } from "./ai-tags";
 import { AI_CAPABILITIES, AI_TAGS } from "./content";
-import { Container } from "./layout";
 import { Reveal } from "./reveal";
 
 const keyword = "text-purple-400";

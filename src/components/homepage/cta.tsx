@@ -1,9 +1,9 @@
 import Link from "next/link";
 
+import { Container } from "@/components/site/container";
 import { Button } from "@/components/ui/button";
 
 import { primaryCta } from "./content";
-import { Container } from "./layout";
 import { Reveal } from "./reveal";
 
 export function Cta({ signedIn }: { signedIn: boolean }) {

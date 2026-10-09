@@ -11,7 +11,7 @@ const isScrolled = () => window.scrollY > 8;
 const isScrolledOnServer = () => false;
 
 /**
- * The fixed homepage header. Translucent at the top of the page and more
+ * The fixed site header. Translucent at the top of the page and more
  * opaque once scrolled; the nav inside it is server-rendered children.
  */
 export function NavbarShell({ children }: { children: React.ReactNode }) {

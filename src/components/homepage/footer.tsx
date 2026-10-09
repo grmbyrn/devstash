@@ -1,7 +1,9 @@
 import Link from "next/link";
 
+import { Container } from "@/components/site/container";
+import { Logo } from "@/components/site/logo";
+
 import { footerColumns } from "./content";
-import { Container, Logo } from "./layout";
 
 export function Footer({ signedIn }: { signedIn: boolean }) {
   return (
@@ -18,15 +20,9 @@ export function Footer({ signedIn }: { signedIn: boolean }) {
               <ul className="grid gap-2 text-sm text-muted-foreground">
                 {links.map(({ href, label }) => (
                   <li key={href}>
-                    {href.startsWith("#") ? (
-                      <a href={href} className="transition-colors hover:text-foreground">
-                        {label}
-                      </a>
-                    ) : (
-                      <Link href={href} className="transition-colors hover:text-foreground">
-                        {label}
-                      </Link>
-                    )}
+                    <Link href={href} className="transition-colors hover:text-foreground">
+                      {label}
+                    </Link>
                   </li>
                 ))}
               </ul>

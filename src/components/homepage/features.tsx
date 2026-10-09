@@ -1,8 +1,9 @@
 import { ItemTypeIcon } from "@/components/dashboard/item-type-icon";
+import { Container } from "@/components/site/container";
 import { systemType } from "@/lib/system-types";
 
 import { FEATURES, type Feature } from "./content";
-import { accentStyle, Container, SectionHeading } from "./layout";
+import { accentStyle, SectionHeading } from "./layout";
 import { Reveal } from "./reveal";
 
 function FeatureCard({ title, description, type, Icon }: Feature) {
