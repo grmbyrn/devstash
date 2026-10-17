@@ -6,6 +6,7 @@ import {
   isUploadType,
   typeLabel,
   typeSlug,
+  quickCopyValue,
   rendersAsMarkdown,
   usesMarkdown,
 } from "@/lib/item-types";
@@ -253,5 +254,39 @@ describe("rendersAsMarkdown", () => {
 
   it("degrades safely for an unknown type", () => {
     expect(rendersAsMarkdown("custom-thing", "markdown")).toBe(false);
+  });
+});
+
+describe("quickCopyValue", () => {
+  const item = (name: string, content: string | null, url: string | null) => ({
+    type: { name },
+    content,
+    url,
+  });
+
+  it("copies a link's URL rather than its content", () => {
+    expect(quickCopyValue(item("link", "notes", "https://x.dev"))).toBe(
+      "https://x.dev",
+    );
+  });
+
+  it("copies text types' content verbatim, untrimmed", () => {
+    expect(quickCopyValue(item("snippet", "  const a = 1;\n", null))).toBe(
+      "  const a = 1;\n",
+    );
+    expect(quickCopyValue(item("command", "ls -la", "https://x.dev"))).toBe(
+      "ls -la",
+    );
+  });
+
+  it("returns null for upload types", () => {
+    expect(quickCopyValue(item("file", "x", "y"))).toBeNull();
+    expect(quickCopyValue(item("image", "x", "y"))).toBeNull();
+  });
+
+  it("returns null when there is nothing to copy", () => {
+    expect(quickCopyValue(item("note", null, null))).toBeNull();
+    expect(quickCopyValue(item("prompt", "   ", null))).toBeNull();
+    expect(quickCopyValue(item("link", "text", null))).toBeNull();
   });
 });

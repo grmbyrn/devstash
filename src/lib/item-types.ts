@@ -116,3 +116,19 @@ export function rendersAsMarkdown(
   if (!editableFields(typeName).language) return false;
   return normalizeLanguage(language) === "markdown";
 }
+
+/**
+ * What a card's quick-copy button puts on the clipboard: the URL for a link,
+ * otherwise the item's text content. Upload types copy nothing — their body is
+ * a stored object, not text — and neither does an item with no body, so the
+ * card can hide the button rather than copy an empty string.
+ */
+export function quickCopyValue(item: {
+  type: { name: string };
+  content: string | null;
+  url: string | null;
+}): string | null {
+  if (isUploadType(item.type.name)) return null;
+  const value = item.type.name === "link" ? item.url : item.content;
+  return value?.trim() ? value : null;
+}
