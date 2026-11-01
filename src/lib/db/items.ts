@@ -262,6 +262,8 @@ export interface CreateItemData {
   language?: string | null;
   url?: string | null;
   tags?: string[];
+  /** Collections to add the new item to. Must already be checked as owned. */
+  collectionIds?: string[];
   /**
    * `FILE` for the file and image types, whose body is an uploaded object.
    * Defaults to `TEXT`, which is what every typed-in type is.
@@ -282,12 +284,16 @@ export interface CreateItemData {
  *
  * Tags are written the same way `updateItem` replaces them: `connectOrCreate`
  * against the global `Tag` table, so one name is always one row.
+ *
+ * Collections are connected by `{ id, userId }`, not the id alone. The action
+ * has already refused foreign ids; this makes the write itself refuse them too,
+ * so a collection can never be joined to an item across accounts.
  */
 export async function createItem(
   userId: string,
   data: CreateItemData,
 ): Promise<ItemDetail> {
-  const { tags, itemTypeId, contentType, ...fields } = data;
+  const { tags, collectionIds, itemTypeId, contentType, ...fields } = data;
 
   // Undefined keys are dropped rather than written as null, so the columns a
   // type doesn't use keep their schema defaults.
@@ -315,6 +321,15 @@ export async function createItem(
             },
           }
         : {}),
+      ...(collectionIds && collectionIds.length > 0
+        ? {
+            collections: {
+              create: collectionIds.map((id) => ({
+                collection: { connect: { id, userId } },
+              })),
+            },
+          }
+        : {}),
     },
     select: itemDetailSelect,
   });
@@ -330,6 +345,11 @@ export interface UpdateItemData {
   language?: string | null;
   url?: string | null;
   tags?: string[];
+  /**
+   * The item's complete collection membership. Absent leaves it alone; `[]`
+   * removes the item from every collection. Must already be checked as owned.
+   */
+  collectionIds?: string[];
 }
 
 /**
@@ -345,15 +365,20 @@ export interface UpdateItemData {
  * and shared across users, so `connectOrCreate` is what keeps one name to one
  * row. Tags left with no items are not cleaned up here.
  *
- * The write and the tag replacement are one nested Prisma call, so a failure
- * part-way cannot leave the item updated with its old tags.
+ * Collections are reconciled rather than replaced: memberships no longer
+ * listed are deleted and the listed ones are `connectOrCreate`d, so a
+ * collection the item stays in keeps its original `addedAt` (the drawer orders
+ * by it). New memberships connect by `{ id, userId }`, as in `createItem`.
+ *
+ * The write, the tag replacement and the collection changes are one nested
+ * Prisma call, so a failure part-way cannot leave the item half-updated.
  */
 export async function updateItem(
   userId: string,
   id: string,
   data: UpdateItemData,
 ): Promise<ItemDetail | null> {
-  const { tags, ...fields } = data;
+  const { tags, collectionIds, ...fields } = data;
 
   // Only keys actually present are written, so a payload that omits `url`
   // leaves the existing value alone instead of nulling it.
@@ -375,6 +400,19 @@ export async function updateItem(
                 create: tags.map((name) => ({
                   tag: {
                     connectOrCreate: { where: { name }, create: { name } },
+                  },
+                })),
+              },
+            }
+          : {}),
+        ...(collectionIds
+          ? {
+              collections: {
+                deleteMany: { collectionId: { notIn: collectionIds } },
+                connectOrCreate: collectionIds.map((collectionId) => ({
+                  where: { itemId_collectionId: { itemId: id, collectionId } },
+                  create: {
+                    collection: { connect: { id: collectionId, userId } },
                   },
                 })),
               },

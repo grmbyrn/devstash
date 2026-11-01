@@ -24,6 +24,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
+import type { CollectionOption } from "@/lib/db/collections";
 import type { ItemDetail, ItemWithMeta } from "@/lib/db/items";
 import { formatFileSize, relativeTime } from "@/lib/format";
 import { editableFields, rendersAsMarkdown } from "@/lib/item-types";
@@ -31,6 +32,7 @@ import { fileUrlForKey, isPreviewableImage } from "@/lib/uploads";
 import { parseTagInput } from "@/lib/validations/item";
 import { cn } from "@/lib/utils";
 
+import { CollectionPicker } from "./collection-picker";
 import { DeleteItemDialog } from "./delete-item-dialog";
 import { ItemTypeIcon } from "./item-type-icon";
 
@@ -42,6 +44,8 @@ interface ItemDrawerProps {
   /** Full detail from `/api/items/[id]`; null while loading or on error. */
   detail: ItemDetail | null;
   error: string | null;
+  /** The user's collections, offered by the edit form. */
+  collections: CollectionOption[];
   /** Hands a saved edit back to the provider, which owns `detail`. */
   onSaved: (item: ItemDetail) => void;
   /** Tells the provider an item is gone, so it can close the drawer. */
@@ -54,6 +58,7 @@ export function ItemDrawer({
   preview,
   detail,
   error,
+  collections,
   onSaved,
   onDeleted,
 }: ItemDrawerProps) {
@@ -121,6 +126,7 @@ export function ItemDrawer({
                 // rather than holding the previous item's text.
                 key={detail.id}
                 item={detail}
+                collections={collections}
                 onCancel={() => setEditingId(null)}
                 onSaved={(updated) => {
                   onSaved(updated);
@@ -477,10 +483,12 @@ function DetailSkeleton() {
  */
 function ItemEditForm({
   item,
+  collections,
   onCancel,
   onSaved,
 }: {
   item: ItemDetail;
+  collections: CollectionOption[];
   onCancel: () => void;
   onSaved: (updated: ItemDetail) => void;
 }) {
@@ -493,6 +501,9 @@ function ItemEditForm({
   const [language, setLanguage] = React.useState(item.language ?? "");
   const [url, setUrl] = React.useState(item.url ?? "");
   const [tagInput, setTagInput] = React.useState(item.tags.join(", "));
+  const [collectionIds, setCollectionIds] = React.useState(() =>
+    item.collections.map((c) => c.id),
+  );
   const [isSaving, setSaving] = React.useState(false);
 
   const canSave = title.trim().length > 0 && !isSaving;
@@ -507,6 +518,8 @@ function ItemEditForm({
         title,
         description,
         tags: parseTagInput(tagInput),
+        // The complete membership, so deselected collections are removed.
+        collectionIds,
         ...(fields.content ? { content } : {}),
         ...(fields.language ? { language } : {}),
         ...(fields.url ? { url } : {}),
@@ -640,18 +653,16 @@ function ItemEditForm({
           />
         </Field>
 
-        {/* Shown, not editable — the type is fixed and collections are managed
-            separately. */}
+        <CollectionPicker
+          collections={collections}
+          value={collectionIds}
+          onChange={setCollectionIds}
+          disabled={isSaving}
+        />
+
+        {/* Shown, not editable — an item's type is fixed once created. */}
         <dl className="flex flex-col gap-1 border-t border-border pt-3 text-xs text-muted-foreground">
           <Meta term="Type" value={item.type.name} />
-          <Meta
-            term="Collections"
-            value={
-              item.collections.length > 0
-                ? item.collections.map((c) => c.name).join(", ")
-                : "None"
-            }
-          />
           <Meta term="Created" value={relativeTime(item.createdAt)} />
           <Meta term="Updated" value={relativeTime(item.updatedAt)} />
         </dl>

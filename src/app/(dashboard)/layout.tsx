@@ -8,6 +8,7 @@ import { Sidebar, SidebarTrigger } from "@/components/dashboard/sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { SidebarProvider } from "@/components/dashboard/sidebar-provider";
 import {
+  getCollectionOptions,
   getFavoriteCollections,
   getRecentCollections,
 } from "@/lib/db/collections";
@@ -32,12 +33,15 @@ export default async function DashboardLayout({
   }
   const userId = session.user.id;
 
-  const [itemTypes, favorites, recentCollections] = await Promise.all([
+  const [itemTypes, favorites, recentCollections, collectionOptions] =
+    await Promise.all([
     getSystemItemTypes(),
     getFavoriteCollections(userId),
     // Fetch the same args the page uses so the cached query is shared, then
     // take the subset the sidebar renders.
     getRecentCollections(userId, RECENT_COLLECTIONS_LIMIT),
+    // Every collection, for the item forms' picker.
+    getCollectionOptions(userId),
   ]);
   const recents = recentCollections.slice(0, SIDEBAR_RECENT_LIMIT);
   const user = {
@@ -63,11 +67,16 @@ export default async function DashboardLayout({
             </div>
             <div className="ml-auto flex items-center gap-2">
               <NewCollectionButton />
-              <NewItemButton itemTypes={itemTypes} />
+              <NewItemButton
+                itemTypes={itemTypes}
+                collections={collectionOptions}
+              />
             </div>
           </header>
           <main className="flex-1 p-6">
-            <ItemDrawerProvider>{children}</ItemDrawerProvider>
+            <ItemDrawerProvider collections={collectionOptions}>
+              {children}
+            </ItemDrawerProvider>
           </main>
         </div>
       </div>

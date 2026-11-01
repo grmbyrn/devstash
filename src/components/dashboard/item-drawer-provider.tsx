@@ -2,6 +2,7 @@
 
 import * as React from "react";
 
+import type { CollectionOption } from "@/lib/db/collections";
 import type { ItemDetail, ItemWithMeta } from "@/lib/db/items";
 
 import { ItemDrawer } from "./item-drawer";
@@ -30,8 +31,11 @@ export function useItemDrawer() {
  * on `/items/[type]` — can open it without any grid threading state down.
  */
 export function ItemDrawerProvider({
+  collections,
   children,
 }: {
+  /** The user's collections, offered by the drawer's edit form. */
+  collections: CollectionOption[];
   children: React.ReactNode;
 }) {
   const [isOpen, setOpen] = React.useState(false);
@@ -132,6 +136,7 @@ export function ItemDrawerProvider({
         preview={preview}
         detail={detail}
         error={error}
+        collections={collections}
         onSaved={handleSaved}
         onDeleted={handleDeleted}
       />

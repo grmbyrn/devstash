@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createItemSchema,
+  MAX_COLLECTIONS,
   MAX_TAGS,
   parseTagInput,
   updateItemSchema,
@@ -125,6 +126,52 @@ describe("updateItemSchema — tags", () => {
     const result = updateItemSchema.safeParse({ title: "t", tags: tooMany });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe("collectionIds", () => {
+  it("leaves membership alone when absent on update", () => {
+    expect(updateItemSchema.parse({ title: "t" })).not.toHaveProperty(
+      "collectionIds",
+    );
+    expect(updateItemSchema.parse({ title: "t" }).collectionIds).toBeUndefined();
+  });
+
+  it("keeps an empty list, which means remove from every collection", () => {
+    expect(
+      updateItemSchema.parse({ title: "t", collectionIds: [] }).collectionIds,
+    ).toEqual([]);
+  });
+
+  it("drops duplicate ids so the join rows can't collide", () => {
+    expect(
+      createItemSchema.parse({
+        itemTypeId: "type_snippet",
+        title: "t",
+        collectionIds: ["col_1", "col_2", "col_1"],
+      }).collectionIds,
+    ).toEqual(["col_1", "col_2"]);
+  });
+
+  it("rejects a blank id", () => {
+    const result = updateItemSchema.safeParse({
+      title: "t",
+      collectionIds: ["col_1", " "],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toBe("Choose a valid collection");
+  });
+
+  it("caps the number of collections", () => {
+    const tooMany = Array.from(
+      { length: MAX_COLLECTIONS + 1 },
+      (_, i) => `col_${i}`,
+    );
+
+    expect(
+      updateItemSchema.safeParse({ title: "t", collectionIds: tooMany }).success,
+    ).toBe(false);
   });
 });
 

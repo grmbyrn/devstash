@@ -151,6 +151,22 @@ describe("user scoping on dashboard queries", () => {
    * referencing it does. Losing the `userId` here would serve any user's
    * uploads to anyone who learned a key.
    */
+  it("getCollectionOptions offers only the user's collections", async () => {
+    await collections.getCollectionOptions(USER);
+
+    expect(prismaMock.collection.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: USER } }),
+    );
+  });
+
+  it("countOwnedCollections counts only the user's collections among the ids", async () => {
+    await collections.countOwnedCollections(USER, ["col_1", "col_2"]);
+
+    expect(prismaMock.collection.count).toHaveBeenCalledWith({
+      where: { userId: USER, id: { in: ["col_1", "col_2"] } },
+    });
+  });
+
   it("getItemByFileKey scopes to the user as well as the key", async () => {
     prismaMock.item.findFirst.mockResolvedValue(null);
 
