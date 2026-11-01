@@ -107,6 +107,43 @@ export async function getFavoriteCollections(
   });
 }
 
+/** A collection as the item forms offer it for selection. */
+export interface CollectionOption {
+  id: string;
+  name: string;
+}
+
+/**
+ * Every collection a user owns, alphabetically, for the item forms' collection
+ * picker. Unlike the sidebar lists this is not limited — the picker has to
+ * offer all of them, or an item could belong to a collection it can't show.
+ *
+ * Wrapped in `cache()` like `getRecentCollections`, so the layout and any page
+ * asking in the same render share one query.
+ */
+export const getCollectionOptions = cache(async function getCollectionOptions(
+  userId: string,
+): Promise<CollectionOption[]> {
+  return prisma.collection.findMany({
+    where: { userId },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
+});
+
+/**
+ * How many of `ids` name collections `userId` owns. The item actions compare
+ * this against the list's length to refuse a foreign or unknown id before
+ * writing, so the user gets a clear message rather than a failed write.
+ */
+export async function countOwnedCollections(
+  userId: string,
+  ids: string[],
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  return prisma.collection.count({ where: { userId, id: { in: ids } } });
+}
+
 /** Aggregate collection stats for a user's dashboard stat cards. */
 export async function getCollectionStats(userId: string): Promise<{
   total: number;

@@ -245,6 +245,45 @@ describe("updateItem", () => {
     expect(data).not.toHaveProperty("tags");
   });
 
+  it("reconciles collections: drops unlisted ones and keeps or adds listed ones", async () => {
+    await updateItem("user_1", "item_1", {
+      title: "t",
+      collectionIds: ["col_1", "col_2"],
+    });
+
+    const { data } = prismaMock.item.update.mock.calls[0][0];
+    expect(data.collections.deleteMany).toEqual({
+      collectionId: { notIn: ["col_1", "col_2"] },
+    });
+    expect(data.collections.connectOrCreate).toEqual([
+      {
+        where: { itemId_collectionId: { itemId: "item_1", collectionId: "col_1" } },
+        create: { collection: { connect: { id: "col_1", userId: "user_1" } } },
+      },
+      {
+        where: { itemId_collectionId: { itemId: "item_1", collectionId: "col_2" } },
+        create: { collection: { connect: { id: "col_2", userId: "user_1" } } },
+      },
+    ]);
+  });
+
+  it("removes the item from every collection when given an empty array", async () => {
+    await updateItem("user_1", "item_1", { title: "t", collectionIds: [] });
+
+    const { data } = prismaMock.item.update.mock.calls[0][0];
+    expect(data.collections).toEqual({
+      deleteMany: { collectionId: { notIn: [] } },
+      connectOrCreate: [],
+    });
+  });
+
+  it("leaves collections alone when the payload omits them", async () => {
+    await updateItem("user_1", "item_1", { title: "t" });
+
+    const { data } = prismaMock.item.update.mock.calls[0][0];
+    expect(data).not.toHaveProperty("collections");
+  });
+
   it("returns the refreshed detail with dates serialized for the wire", async () => {
     const result = await updateItem("user_1", "item_1", { title: "t" });
 
@@ -516,6 +555,33 @@ describe("createItem", () => {
         },
       },
     ]);
+  });
+
+  it("joins the new item to each collection, connecting by owner as well as id", async () => {
+    await createItem("user_1", {
+      itemTypeId: "type_snippet",
+      title: "t",
+      collectionIds: ["col_1", "col_2"],
+    });
+
+    const { data } = prismaMock.item.create.mock.calls[0][0];
+    expect(data.collections).toEqual({
+      create: [
+        { collection: { connect: { id: "col_1", userId: "user_1" } } },
+        { collection: { connect: { id: "col_2", userId: "user_1" } } },
+      ],
+    });
+  });
+
+  it("omits the collection write when there are no collections", async () => {
+    await createItem("user_1", {
+      itemTypeId: "type_snippet",
+      title: "t",
+      collectionIds: [],
+    });
+
+    const { data } = prismaMock.item.create.mock.calls[0][0];
+    expect(data).not.toHaveProperty("collections");
   });
 
   it("omits the tag write entirely when there are no tags", async () => {

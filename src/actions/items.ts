@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@/auth";
+import { countOwnedCollections } from "@/lib/db/collections";
 import {
   createItem as createItemQuery,
   deleteItem as deleteItemQuery,
@@ -21,6 +22,22 @@ import { createItemSchema, updateItemSchema } from "@/lib/validations/item";
 export type ActionResult<T> =
   | { success: true; data: T; error?: never }
   | { success: false; data?: never; error: string };
+
+/**
+ * Whether every id names a collection the user owns. An empty or absent list
+ * trivially passes. Checked before any write so a foreign or unknown id gets a
+ * clear refusal, and the same message either way — the action can't be used to
+ * learn which collection ids exist.
+ */
+async function ownsAllCollections(
+  userId: string,
+  ids: string[] | undefined,
+): Promise<boolean> {
+  if (!ids || ids.length === 0) return true;
+  return (await countOwnedCollections(userId, ids)) === ids.length;
+}
+
+const INVALID_COLLECTION = "Choose a valid collection.";
 
 /**
  * Create an item from the "New item" dialog.
@@ -56,7 +73,12 @@ export async function createItem(
       };
     }
 
-    const { itemTypeId, tags, title, description, ...rest } = parsed.data;
+    const { itemTypeId, tags, collectionIds, title, description, ...rest } =
+      parsed.data;
+
+    if (!(await ownsAllCollections(session.user.id, collectionIds))) {
+      return { success: false, error: INVALID_COLLECTION };
+    }
 
     const itemType = (await getSystemItemTypes()).find(
       (type) => type.id === itemTypeId,
@@ -72,6 +94,7 @@ export async function createItem(
       title,
       description,
       tags,
+      collectionIds,
       ...(fields.content ? { content: rest.content } : {}),
       ...(fields.language ? { language: rest.language } : {}),
       ...(fields.url ? { url: rest.url } : {}),
@@ -172,6 +195,10 @@ export async function updateItem(
         success: false,
         error: parsed.error.issues[0]?.message ?? "Invalid input.",
       };
+    }
+
+    if (!(await ownsAllCollections(session.user.id, parsed.data.collectionIds))) {
+      return { success: false, error: INVALID_COLLECTION };
     }
 
     const item = await updateItemQuery(session.user.id, itemId, parsed.data);

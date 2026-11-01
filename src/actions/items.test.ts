@@ -5,8 +5,12 @@ const createItemQueryMock = vi.fn();
 const updateItemQueryMock = vi.fn();
 const deleteItemQueryMock = vi.fn();
 const getSystemItemTypesMock = vi.fn();
+const countOwnedCollectionsMock = vi.fn();
 
 vi.mock("@/auth", () => ({ auth: authMock }));
+vi.mock("@/lib/db/collections", () => ({
+  countOwnedCollections: countOwnedCollectionsMock,
+}));
 vi.mock("@/lib/db/items", () => ({
   createItem: createItemQueryMock,
   updateItem: updateItemQueryMock,
@@ -138,6 +142,86 @@ describe("updateItem action", () => {
     expect(payload).toHaveProperty("content", "x");
     expect(payload).not.toHaveProperty("url");
     expect(payload).not.toHaveProperty("language");
+  });
+});
+
+describe("collection membership", () => {
+  beforeEach(() => {
+    authMock.mockResolvedValue(SESSION);
+    getSystemItemTypesMock.mockResolvedValue(SYSTEM_TYPES);
+    createItemQueryMock.mockResolvedValue(savedItem);
+    updateItemQueryMock.mockResolvedValue(savedItem);
+    // By default every id asked about is owned.
+    countOwnedCollectionsMock.mockImplementation(
+      async (_userId: string, ids: string[]) => ids.length,
+    );
+  });
+
+  it("checks ownership against the session's user and forwards the ids on create", async () => {
+    const result = await createItem({
+      itemTypeId: "type_snippet",
+      title: "t",
+      collectionIds: ["col_1", "col_2"],
+    });
+
+    expect(result.success).toBe(true);
+    expect(countOwnedCollectionsMock).toHaveBeenCalledWith("user_1", [
+      "col_1",
+      "col_2",
+    ]);
+    expect(createItemQueryMock).toHaveBeenCalledWith(
+      "user_1",
+      expect.objectContaining({ collectionIds: ["col_1", "col_2"] }),
+    );
+  });
+
+  it("refuses to create into a collection the user doesn't own, without writing", async () => {
+    countOwnedCollectionsMock.mockResolvedValue(1);
+
+    const result = await createItem({
+      itemTypeId: "type_snippet",
+      title: "t",
+      collectionIds: ["col_1", "col_foreign"],
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Choose a valid collection.",
+    });
+    expect(createItemQueryMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses to update into a collection the user doesn't own, without writing", async () => {
+    countOwnedCollectionsMock.mockResolvedValue(0);
+
+    const result = await updateItem("item_1", {
+      title: "t",
+      collectionIds: ["col_foreign"],
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Choose a valid collection.",
+    });
+    expect(updateItemQueryMock).not.toHaveBeenCalled();
+  });
+
+  it("forwards an empty list on update, so the item leaves every collection", async () => {
+    await updateItem("item_1", { title: "t", collectionIds: [] });
+
+    expect(countOwnedCollectionsMock).not.toHaveBeenCalled();
+    expect(updateItemQueryMock).toHaveBeenCalledWith(
+      "user_1",
+      "item_1",
+      expect.objectContaining({ collectionIds: [] }),
+    );
+  });
+
+  it("skips the ownership check when no collections are sent", async () => {
+    await createItem({ itemTypeId: "type_snippet", title: "t" });
+    await updateItem("item_1", { title: "t" });
+
+    expect(countOwnedCollectionsMock).not.toHaveBeenCalled();
   });
 });
 

@@ -3,6 +3,9 @@ import { z } from "zod";
 /** Upper bound on tags per item, so a paste can't write unbounded rows. */
 export const MAX_TAGS = 25;
 
+/** Upper bound on collections per save, for the same reason as `MAX_TAGS`. */
+export const MAX_COLLECTIONS = 50;
+
 /**
  * Ceiling for the reported `fileSize`, matching the largest upload tier (the
  * 10 MB file type). The per-kind limits are enforced against the real bytes in
@@ -59,6 +62,23 @@ const tagList = z
   })
   .optional();
 
+/**
+ * The collections an item belongs to, as ids. Shared by create and update.
+ *
+ * On update the list is the item's *complete* membership, so absent and empty
+ * mean different things: absent leaves membership alone, `[]` removes the item
+ * from every collection. Duplicates are dropped because the join table's
+ * primary key is (item, collection) and a repeat would collide on insert.
+ *
+ * Ownership is not checked here — that needs the database, so the action does
+ * it against the session.
+ */
+const collectionIdList = z
+  .array(z.string().trim().min(1, "Choose a valid collection"))
+  .max(MAX_COLLECTIONS, `Use at most ${MAX_COLLECTIONS} collections`)
+  .transform((ids) => [...new Set(ids)])
+  .optional();
+
 /** The title rule, identical on create and update. */
 const itemTitle = z
   .string()
@@ -77,6 +97,7 @@ export const updateItemSchema = z.object({
   language: nullableText,
   url: nullableUrl,
   tags: tagList,
+  collectionIds: collectionIdList,
 });
 
 export type UpdateItemInput = z.infer<typeof updateItemSchema>;
@@ -107,6 +128,7 @@ export const createItemSchema = z.object({
   language: nullableText,
   url: nullableUrl,
   tags: tagList,
+  collectionIds: collectionIdList,
   // ── Upload fields, for the file and image types ──────────────────────────
   //
   // These describe an object the upload route has *already* stored, so they are

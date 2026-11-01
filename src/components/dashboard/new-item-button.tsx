@@ -22,12 +22,14 @@ import { FileUpload, type UploadedFile } from "@/components/ui/file-upload";
 import { Input } from "@/components/ui/input";
 import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { Textarea } from "@/components/ui/textarea";
+import type { CollectionOption } from "@/lib/db/collections";
 import type { ItemTypeSummary } from "@/lib/db/items";
 import { editableFields, isUploadType, rendersAsMarkdown } from "@/lib/item-types";
 import { uploadKindFor } from "@/lib/uploads";
 import { parseTagInput } from "@/lib/validations/item";
 import { cn } from "@/lib/utils";
 
+import { CollectionPicker } from "./collection-picker";
 import { ItemTypeIcon } from "./item-type-icon";
 
 /**
@@ -38,7 +40,13 @@ import { ItemTypeIcon } from "./item-type-icon";
  * around the whole shell, this owns its own open state and is the only client
  * code the header needs.
  */
-export function NewItemButton({ itemTypes }: { itemTypes: ItemTypeSummary[] }) {
+export function NewItemButton({
+  itemTypes,
+  collections,
+}: {
+  itemTypes: ItemTypeSummary[];
+  collections: CollectionOption[];
+}) {
   const [isOpen, setOpen] = React.useState(false);
 
   if (itemTypes.length === 0) return null;
@@ -61,7 +69,11 @@ export function NewItemButton({ itemTypes }: { itemTypes: ItemTypeSummary[] }) {
         </DialogHeader>
         {/* Radix unmounts the content on close, so the form's state resets
             itself — reopening always starts blank without an effect. */}
-        <NewItemForm itemTypes={itemTypes} onCreated={() => setOpen(false)} />
+        <NewItemForm
+          itemTypes={itemTypes}
+          collections={collections}
+          onCreated={() => setOpen(false)}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -79,9 +91,11 @@ export function NewItemButton({ itemTypes }: { itemTypes: ItemTypeSummary[] }) {
  */
 function NewItemForm({
   itemTypes,
+  collections,
   onCreated,
 }: {
   itemTypes: ItemTypeSummary[];
+  collections: CollectionOption[];
   onCreated: () => void;
 }) {
   const router = useRouter();
@@ -93,6 +107,7 @@ function NewItemForm({
   const [language, setLanguage] = React.useState("");
   const [url, setUrl] = React.useState("");
   const [tagInput, setTagInput] = React.useState("");
+  const [collectionIds, setCollectionIds] = React.useState<string[]>([]);
   const [upload, setUpload] = React.useState<UploadedFile | null>(null);
   const [isSaving, setSaving] = React.useState(false);
 
@@ -122,6 +137,7 @@ function NewItemForm({
         title,
         description,
         tags: parseTagInput(tagInput),
+        collectionIds,
         ...(fields.content ? { content } : {}),
         ...(fields.language ? { language } : {}),
         ...(fields.url ? { url } : {}),
@@ -294,6 +310,13 @@ function NewItemForm({
           placeholder="react, hooks"
         />
       </Field>
+
+      <CollectionPicker
+        collections={collections}
+        value={collectionIds}
+        onChange={setCollectionIds}
+        disabled={isSaving}
+      />
 
       <DialogFooter>
         <Button type="submit" size="sm" disabled={!canSave}>
