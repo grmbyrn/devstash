@@ -119,3 +119,31 @@ export async function getCollectionStats(userId: string): Promise<{
 
   return { total, favorites };
 }
+
+/** A newly created collection, as the create action hands it back. */
+export interface CreatedCollection {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+/**
+ * Create a collection owned by `userId`.
+ *
+ * There's no `where` clause to carry ownership — the row doesn't exist yet — so
+ * the owner is connected from the caller's id, which the action takes from the
+ * session rather than from the request.
+ */
+export async function createCollection(
+  userId: string,
+  data: { name: string; description: string | null },
+): Promise<CreatedCollection> {
+  return prisma.collection.create({
+    data: {
+      name: data.name,
+      description: data.description,
+      user: { connect: { id: userId } },
+    },
+    select: { id: true, name: true, description: true },
+  });
+}

@@ -82,6 +82,19 @@ describe("user scoping on dashboard queries", () => {
     expect(data.user).toEqual({ connect: { id: USER } });
   });
 
+  it("createCollection creates the row under the given user", async () => {
+    prismaMock.collection.create.mockResolvedValue({
+      id: "col_new",
+      name: "n",
+      description: null,
+    });
+
+    await collections.createCollection(USER, { name: "n", description: null });
+
+    const { data } = prismaMock.collection.create.mock.calls[0][0];
+    expect(data.user).toEqual({ connect: { id: USER } });
+  });
+
   it("deleteItem scopes the delete to the user, not just the id", async () => {
     prismaMock.item.delete.mockResolvedValue({ fileUrl: null });
 
