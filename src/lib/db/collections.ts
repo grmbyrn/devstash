@@ -25,24 +25,18 @@ export interface CollectionWithMeta {
 }
 
 /**
- * Fetch a user's most recently updated collections, each enriched with its item
- * count and the item types it contains (ranked by frequency).
- *
- * Wrapped in React's `cache()` so the sidebar (layout) and the main grid (page)
- * share a single DB round trip per request as long as they pass the same args.
- *
- * Note: `cache()` keys on the *raw arguments*, not the resolved default — so any
- * new caller must pass `RECENT_COLLECTIONS_LIMIT` explicitly to share the cache;
- * calling `getRecentCollections(userId)` with no limit creates a separate entry.
+ * A user's collections, most recently updated first, each enriched with its
+ * item count and the item types it contains (ranked by frequency). Omitting
+ * `take` returns every collection.
  */
-export const getRecentCollections = cache(async function getRecentCollections(
+async function findCollectionsWithMeta(
   userId: string,
-  limit = RECENT_COLLECTIONS_LIMIT,
+  take?: number,
 ): Promise<CollectionWithMeta[]> {
   const collections = await prisma.collection.findMany({
     where: { userId },
     orderBy: { updatedAt: "desc" },
-    take: limit,
+    take,
     include: {
       _count: { select: { items: true } },
       defaultType: { select: { id: true, name: true, icon: true, color: true } },
@@ -85,6 +79,55 @@ export const getRecentCollections = cache(async function getRecentCollections(
       accentType,
       types: ranked.map((entry) => entry.type),
     };
+  });
+}
+
+/**
+ * Fetch a user's most recently updated collections for the dashboard grid and
+ * the sidebar's Recent list.
+ *
+ * Wrapped in React's `cache()` so the sidebar (layout) and the main grid (page)
+ * share a single DB round trip per request as long as they pass the same args.
+ *
+ * Note: `cache()` keys on the *raw arguments*, not the resolved default — so any
+ * new caller must pass `RECENT_COLLECTIONS_LIMIT` explicitly to share the cache;
+ * calling `getRecentCollections(userId)` with no limit creates a separate entry.
+ */
+export const getRecentCollections = cache(async function getRecentCollections(
+  userId: string,
+  limit = RECENT_COLLECTIONS_LIMIT,
+): Promise<CollectionWithMeta[]> {
+  return findCollectionsWithMeta(userId, limit);
+});
+
+/** Every collection a user owns, for the `/collections` page. */
+export async function getAllCollections(
+  userId: string,
+): Promise<CollectionWithMeta[]> {
+  return findCollectionsWithMeta(userId);
+}
+
+/** A single collection as its own page's header renders it. */
+export interface CollectionSummary {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+/**
+ * One collection by id, for `/collections/[id]`. Ownership sits in the `where`
+ * clause, so another user's collection is simply absent and the page answers
+ * 404 exactly as it does for an unknown id.
+ *
+ * Wrapped in `cache()` so the page and its `generateMetadata` share one query.
+ */
+export const getCollectionById = cache(async function getCollectionById(
+  userId: string,
+  id: string,
+): Promise<CollectionSummary | null> {
+  return prisma.collection.findFirst({
+    where: { id, userId },
+    select: { id: true, name: true, description: true },
   });
 });
 

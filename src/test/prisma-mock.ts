@@ -38,6 +38,7 @@ export const prismaMock = {
   },
   collection: {
     count: vi.fn(),
+    findFirst: vi.fn(),
     findMany: vi.fn(),
     create: vi.fn(),
   },

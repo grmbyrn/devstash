@@ -124,6 +124,34 @@ describe("user scoping on dashboard queries", () => {
     );
   });
 
+  it("getAllCollections scopes to the user and returns every collection", async () => {
+    await collections.getAllCollections(USER);
+
+    expect(prismaMock.collection.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: USER }, take: undefined }),
+    );
+  });
+
+  it("getCollectionById scopes to the user as well as the id", async () => {
+    prismaMock.collection.findFirst.mockResolvedValue(null);
+
+    await collections.getCollectionById(USER, "col_1");
+
+    expect(prismaMock.collection.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "col_1", userId: USER } }),
+    );
+  });
+
+  it("getItemsByCollection scopes to the user as well as the collection", async () => {
+    await items.getItemsByCollection(USER, "col_1");
+
+    expect(prismaMock.item.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: USER, collections: { some: { collectionId: "col_1" } } },
+      }),
+    );
+  });
+
   it("getFavoriteCollections scopes to the user and to favorites", async () => {
     await collections.getFavoriteCollections(USER);
 
