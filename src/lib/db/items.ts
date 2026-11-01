@@ -142,6 +142,28 @@ export async function getItemsByType(
   return rows.map(toItemWithMeta);
 }
 
+/**
+ * Every item of one user's that belongs to a collection, for
+ * `/collections/[id]`. Same ordering as `getItemsByType`: pinned first, then
+ * most recently used, then most recently updated.
+ */
+export async function getItemsByCollection(
+  userId: string,
+  collectionId: string,
+): Promise<ItemWithMeta[]> {
+  const rows = await prisma.item.findMany({
+    where: { userId, collections: { some: { collectionId } } },
+    orderBy: [
+      { isPinned: "desc" },
+      { lastUsedAt: { sort: "desc", nulls: "last" } },
+      { updatedAt: "desc" },
+    ],
+    select: itemCardSelect,
+  });
+
+  return rows.map(toItemWithMeta);
+}
+
 // Canonical display order for the seeded system types; anything unknown
 // (e.g. future custom types) sorts to the end.
 const SYSTEM_TYPE_ORDER: string[] = SYSTEM_TYPES.map((type) => type.name);
