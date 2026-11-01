@@ -1,6 +1,7 @@
 import { Search } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
+import { NewCollectionButton } from "@/components/dashboard/new-collection-button";
 import { NewItemButton } from "@/components/dashboard/new-item-button";
 import { ItemDrawerProvider } from "@/components/dashboard/item-drawer-provider";
 import { Sidebar, SidebarTrigger } from "@/components/dashboard/sidebar";
@@ -60,7 +61,8 @@ export default async function DashboardLayout({
                 className="h-9 pl-8"
               />
             </div>
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
+              <NewCollectionButton />
               <NewItemButton itemTypes={itemTypes} />
             </div>
           </header>

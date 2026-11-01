@@ -39,6 +39,7 @@ export const prismaMock = {
   collection: {
     count: vi.fn(),
     findMany: vi.fn(),
+    create: vi.fn(),
   },
   // Actions pass an array of operations; resolving it is enough for unit tests.
   $transaction: vi.fn(async (operations: Promise<unknown>[]) =>
